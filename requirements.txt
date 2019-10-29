@@ -1,0 +1,3 @@
+fastavro
+confluent-kafka
+tqdm
