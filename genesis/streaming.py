@@ -20,17 +20,37 @@ assert is_heartbeat(HEARTBEAT_SENTINEL)
 def _noop(msg):
 	return msg
 
+## Message parsing
+
+def parse_avro(val):
+	with io.BytesIO(val) as fp:
+		rr = fastavro.reader(fp)
+		for record in rr:
+			yield rr
+
+def parse_json(val):
+	yield json.loads(val)
+
+def parse_blob(val):
+	yield val
+
+_MESSAGE_PARSERS = {
+	'avro': parse_avro,
+	'json': parse_json,
+	'blob': parse_blob
+}
+
 class ParseAndFilter:
-	def __init__(self, filter):
+	def __init__(self, parser, filter):
+		self.parser = parser if parser is not None else parse_blob
 		self.filter = filter if filter is not None else _noop
 
 	def __call__(self, msg):
 		topic, part, offs, val = msg
+		for record in self.parser(val):
+			return topic, part, offs, self.filter(record)
 
-		with io.BytesIO(val) as fp:
-			rr = fastavro.reader(fp)
-			for record in rr:
-				return topic, part, offs, self.filter(record)
+## URL parsing
 
 def parse_kafka_url(val, allow_no_topic=False):
 	assert val.startswith("kafka://")
@@ -61,7 +81,7 @@ def open(*args, **kwargs):
 class AlertBroker:
 	c = None
 
-	def __init__(self, broker_url, start_at='latest'):
+	def __init__(self, broker_url, start_at='latest', format='avro'):
 		self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
 
 		if self.groupid is None:
@@ -84,6 +104,8 @@ class AlertBroker:
 		})
 
 		self.c.subscribe(self.topics)
+
+		self._parser = _MESSAGE_PARSERS[format]		# message deserializer
 
 		self._buffer = {}		# local raw message buffer
 
@@ -150,7 +172,7 @@ class AlertBroker:
 				msgs = [ (msg.topic(), msg.partition(), msg.offset(), msg.value()) for msg in msgs ]
 
 				# process the messages on the workers
-				for i, (topic, part, offs, rec) in enumerate(mapper(ParseAndFilter(filter), msgs)):
+				for i, (topic, part, offs, rec) in enumerate(mapper(ParseAndFilter(parser=self._parser, filter=filter), msgs)):
 					# pop the message from the buffer, indicating we've processed it
 					del self._buffer[i]
 
