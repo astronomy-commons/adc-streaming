@@ -4,7 +4,7 @@ import sys, io, time, argparse, string, signal, itertools, os.path
 import json, base64
 import fastavro, fastavro.write
 
-from confluent_kafka import Consumer, KafkaError, TopicPartition
+from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
 from contextlib import contextmanager
 from collections import namedtuple
 
@@ -39,6 +39,22 @@ _MESSAGE_PARSERS = {
 	'json': parse_json,
 	'blob': parse_blob
 }
+
+## Message serialization
+
+def serialize_json(val):
+	return json.dumps(val)
+
+def serialize_blob(val):
+	return val
+
+_MESSAGE_SERIALIZERS = {
+	'json': serialize_json,
+	'blob': serialize_blob
+}
+
+
+##
 
 class ParseAndFilter:
 	def __init__(self, parser, filter):
@@ -75,14 +91,18 @@ def parse_kafka_url(val, allow_no_topic=False):
 	return (groupid, brokers, topics)
 
 
-def open(*args, **kwargs):
-	return AlertBroker(*args, **kwargs)
+def open(url, mode='r', **kwargs):
+	return AlertBroker(url, mode, **kwargs)
 
 class AlertBroker:
 	c = None
+	p = None
 
-	def __init__(self, broker_url, start_at='latest', format='avro'):
+	def __init__(self, broker_url, mode='r', start_at='latest', format='avro'):
 		self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
+
+		# mode can be 'r', 'w', or 'rw'; other characters are ignored
+		assert 'r' in mode or 'w' in mode
 
 		if self.groupid is None:
 			# if groupid hasn't been given, emulate a low-level consumer:
@@ -93,19 +113,25 @@ class AlertBroker:
 			self.groupid = getpass.getuser() + '-' + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(20))
 #			print(f"Generated fake groupid {self.groupid}")
 
-		self.c = Consumer({
-			'bootstrap.servers': self.brokers,
-			'group.id': self.groupid,
-			'default.topic.config': {
-				'auto.offset.reset': start_at
-			},
-			'enable.auto.commit': False,
-			'queued.min.messages': 1000,
-		})
+		if 'r' in mode:
+			self.c = Consumer({
+				'bootstrap.servers': self.brokers,
+				'group.id': self.groupid,
+				'default.topic.config': {
+					'auto.offset.reset': start_at
+				},
+				'enable.auto.commit': False,
+				'queued.min.messages': 1000,
+			})
 
-		self.c.subscribe(self.topics)
+			self.c.subscribe(self.topics)
+			self._parser = _MESSAGE_PARSERS[format]		# message deserializer
 
-		self._parser = _MESSAGE_PARSERS[format]		# message deserializer
+		if 'w' in mode:
+			self.p = Producer({
+				'bootstrap.servers': self.brokers,
+			})
+			self._serialize = _MESSAGE_SERIALIZERS[format]	# message serializer
 
 		self._buffer = {}		# local raw message buffer
 
@@ -131,6 +157,8 @@ class AlertBroker:
 			self.c.unsubscribe()
 			self.c.close()
 			self.c = None
+		if self.p:
+			self.p.flush()
 
 	def _raw_stream(self, timeout):
 		last_msg_time = time.time()
@@ -245,6 +273,14 @@ class AlertBroker:
 
 	def __iter__(self):
 		return self.__call__()
+
+	# producer functionality
+	def write(self, msg):
+		packet = self._serialize(msg)
+		self.p.produce(self.topics[0], packet)
+
+	def flush(self):
+		return self.p.flush()
 
 @contextmanager
 def Pool(*args, **kwarg):
