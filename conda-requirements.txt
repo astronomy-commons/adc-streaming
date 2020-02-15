@@ -1,0 +1,4 @@
+fastavro
+python-confluent-kafka
+tqdm
+conda-build
