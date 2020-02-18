@@ -8,6 +8,8 @@ from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
 from contextlib import contextmanager
 from collections import namedtuple
 
+import configparser
+
 from multiprocessing import Pool as MPPool
 
 # FIXME: Make this into a proper class (safety in the unlikely case the user returns HEARTBEAT_SENTINEL)
@@ -98,7 +100,7 @@ class AlertBroker:
 	c = None
 	p = None
 
-	def __init__(self, broker_url, mode='r', start_at='latest', format='avro'):
+	def __init__(self, broker_url, mode='r', start_at='latest', format='avro', config=None):
 		self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
 
 		# mode can be 'r', 'w', or 'rw'; other characters are ignored
@@ -113,8 +115,21 @@ class AlertBroker:
 			self.groupid = getpass.getuser() + '-' + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(20))
 #			print(f"Generated fake groupid {self.groupid}")
 
+		# load librdkafka configuration file, if given
+		# configurable properties: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+		cfg = dict()
+		if config is not None:
+			if isinstance(config, dict):
+				cfg = config
+			elif isinstance(config, str):
+				import builtins
+				with builtins.open(config) as fp:
+					parser = configparser.ConfigParser()
+					parser.read_string("[root]\n" + fp.read())
+					cfg = dict(parser["root"])
+
 		if 'r' in mode:
-			self.c = Consumer({
+			ccfg={ **cfg,
 				'bootstrap.servers': self.brokers,
 				'group.id': self.groupid,
 				'default.topic.config': {
@@ -122,15 +137,17 @@ class AlertBroker:
 				},
 				'enable.auto.commit': False,
 				'queued.min.messages': 1000,
-			})
+			}
 
+			self.c = Consumer(ccfg)
 			self.c.subscribe(self.topics)
 			self._parser = _MESSAGE_PARSERS[format]		# message deserializer
 
 		if 'w' in mode:
-			self.p = Producer({
+			pcfg={ **cfg,
 				'bootstrap.servers': self.brokers,
-			})
+			}
+			self.p = Producer(pcfg)
 			self._serialize = _MESSAGE_SERIALIZERS[format]	# message serializer
 
 		self._buffer = {}		# local raw message buffer
