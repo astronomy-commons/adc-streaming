@@ -68,6 +68,21 @@ class ParseAndFilter:
 		for record in self.parser(val):
 			return topic, part, offs, self.filter(record)
 
+
+## message validation/processing
+
+def validate_and_process(msgs):
+	for msg in msgs:
+		if msg.error() is None:
+			# unpack and copy so we don't pickle the world (if multiprocessing)
+			yield (msg.topic(), msg.partition(), msg.offset(), msg.value())
+		elif msg.error().code() == KafkaError._PARTITION_EOF:
+			# silently skip _PARTITION_EOF messages
+			continue
+		else:
+			raise Exception(msg.error())
+
+
 ## URL parsing
 
 def parse_kafka_url(val, allow_no_topic=False):
@@ -186,16 +201,8 @@ class AlertBroker:
 					return
 				yield HEARTBEAT_SENTINEL
 			else:
-				# check for errors
-				for msg in msgs:
-					if msg.error() is None:
-						continue
-
-					if msg.error().code() == KafkaError._PARTITION_EOF:
-						continue
-
-					raise Exception(msg.error())
-				yield msgs
+				# unpack messages and check for errors
+				yield list(validate_and_process(msgs))
 
 				# reset the timeout counter
 				last_msg_time = time.time()
@@ -212,9 +219,6 @@ class AlertBroker:
 				yield None, msgs
 			else:
 				self._buffer = dict( enumerate(msgs) )
-
-				# unpack and copy so we don't pickle the world (if multiprocessing)
-				msgs = [ (msg.topic(), msg.partition(), msg.offset(), msg.value()) for msg in msgs ]
 
 				# process the messages on the workers
 				for i, (topic, part, offs, rec) in enumerate(mapper(ParseAndFilter(parser=self._parser, filter=filter), msgs)):
