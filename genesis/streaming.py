@@ -19,10 +19,12 @@ def is_heartbeat(msg):
 
 assert is_heartbeat(HEARTBEAT_SENTINEL)
 
-def _noop(msg):
+def _noop(msg, meta):
 	return msg
 
 ## Message parsing
+
+Metadata = namedtuple("Metadata", "topic partition offset timestamp key")
 
 def parse_avro(val):
 	with io.BytesIO(val) as fp:
@@ -64,9 +66,9 @@ class ParseAndFilter:
 		self.filter = filter if filter is not None else _noop
 
 	def __call__(self, msg):
-		topic, part, offs, val = msg
+		val, meta = msg
 		for record in self.parser(val):
-			return topic, part, offs, self.filter(record)
+			return self.filter(record, meta), meta
 
 
 ## message validation/processing
@@ -75,7 +77,10 @@ def validate_and_process(msgs):
 	for msg in msgs:
 		if msg.error() is None:
 			# unpack and copy so we don't pickle the world (if multiprocessing)
-			yield (msg.topic(), msg.partition(), msg.offset(), msg.value())
+			yield (
+				msg.value(),
+				Metadata(msg.topic(), msg.partition(), msg.offset(), msg.timestamp()[1], msg.key()),
+			)
 		elif msg.error().code() == KafkaError._PARTITION_EOF:
 			# silently skip _PARTITION_EOF messages
 			continue
@@ -115,7 +120,7 @@ class AlertBroker:
 	c = None
 	p = None
 
-	def __init__(self, broker_url, mode='r', start_at='latest', format='avro', config=None):
+	def __init__(self, broker_url, mode='r', start_at='latest', format='avro', metadata=False, config=None):
 		self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
 
 		# mode can be 'r', 'w', or 'rw'; other characters are ignored
@@ -165,9 +170,10 @@ class AlertBroker:
 			self.p = Producer(pcfg)
 			self._serialize = _MESSAGE_SERIALIZERS[format]	# message serializer
 
-		self._buffer = {}		# local raw message buffer
+		# whether to return metadata alongside message contents
+		self._metadata = metadata
 
-		self._idx = 0
+		self._buffer = {}		# local raw message buffer
 
 		self._consumed = {}		# locally consumed (not necessarily committe)
 		self._committed = {}	# locally committed, but not yet committed on kafka
@@ -210,30 +216,27 @@ class AlertBroker:
 			# actualy commit any offsets the user committed
 			self._commit_to_kafka(defer=True)
 
-	# returns a generator returning deserialized, user-processed, messages + heartbeats
+	# returns a generator returning deserialized, user-processed messages
 	def _filtered_stream(self, mapper, filter, timeout):
 		t_last = time.time()
 
 		for msgs in itertools.chain([self._buffer.values()], self._raw_stream(timeout=timeout)):
-			if is_heartbeat(msgs):
-				yield None, msgs
-			else:
+			if not is_heartbeat(msgs):
 				self._buffer = dict( enumerate(msgs) )
 
 				# process the messages on the workers
-				for i, (topic, part, offs, rec) in enumerate(mapper(ParseAndFilter(parser=self._parser, filter=filter), msgs)):
+				for i, (rec, meta) in enumerate(mapper(ParseAndFilter(parser=self._parser, filter=filter), msgs)):
 					# pop the message from the buffer, indicating we've processed it
 					del self._buffer[i]
 
 					# mark as consumed and increment the index _before_ we yield,
 					# as we may never come back from yielding (if the user decides
 					# to break from the loop)
-					self._consumed[(topic, part)] = offs
-					self._idx += 1
+					self._consumed[(meta.topic, meta.partition)] = meta.offset
 
 					# yield if the filter didn't return None
 					if rec is not None:
-						yield self._idx-1, rec
+						yield (rec, meta)
 
 	def commit(self, defer=True):
 		self._committed = self._consumed.copy()
@@ -267,12 +270,8 @@ class AlertBroker:
 		t = tqdm(disable=not progress, total=limit, desc='Alerts processed', unit=' alerts', mininterval=0.5, smoothing=0.5, miniters=0)
 
 		nread = 0
-		for idx, rec in self._filtered_stream(mapper=mapper, filter=filter, timeout=timeout):
-			if is_heartbeat(rec):
-				t.update(0)
-				continue
-
-			yield idx, rec
+		for rec, meta in self._filtered_stream(mapper=mapper, filter=filter, timeout=timeout):
+			yield (rec, meta) if self._metadata else rec
 
 			t.update()
 			nread += 1
@@ -283,7 +282,7 @@ class AlertBroker:
 		t.close()
 
 	# returns a generator for the user-mapped messages using the filter function,
-	# possibly executed on ncores and up to maxread values, + heartbeats
+	# possibly executed on ncores and up to maxread values
 	def __call__(self, filter=None, pool=None, progress=False, timeout=None, limit=None):
 		if pool:
 			mapper = lambda fun, vec: pool.imap(fun, vec, chunksize=100)
