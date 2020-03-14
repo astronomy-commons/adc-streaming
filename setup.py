@@ -11,9 +11,11 @@ def git_version():
       #
       # * If the current commit is past an annotated tag, the version is constructed at:
       #
-      #    '{tag}.dev{commitcount}+{gitsha}'
+      #    '{tag+1}.dev{commitcount}+{gitsha}'
       #
       #  where {commitcount} is the number of commits after the tag (obtained with `git describe`)
+      #  and {tag+1} is the tag version incremented by one (i.e., if tag=0.0.1, it's 0.0.2). This
+      #  is needed because .dev tags compare as less than non-.dev tags, per PEP-440.
       #
       # * If there are no annotated tags in the past, the version is:
       #
@@ -42,6 +44,11 @@ def git_version():
             sha = parts[0]
             # Number of commits since the beginning of the current branch
             count = check_output("git rev-list --count HEAD".split()).decode('utf-8').strip()
+
+      # this will be a .dev version; increment the patchlevel
+      xyz = (tag.split('.') + [ '0', '0' ])[:3]
+      xyz[-1] = str( int(xyz[-1]) + 1 )
+      tag = '.'.join(xyz)
 
       fmt = '{tag}.dev{commitcount}+{gitsha}'
       return fmt.format(tag=tag, commitcount=count, gitsha=sha.lstrip('g'))
