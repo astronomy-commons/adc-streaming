@@ -24,7 +24,7 @@ def _noop(msg, meta):
 
 ## Message parsing
 
-Metadata = namedtuple("Metadata", "topic partition offset timestamp key")
+Metadata = namedtuple("Metadata", "topic partition offset timestamp key idx")
 
 def parse_avro(val):
 	with io.BytesIO(val) as fp:
@@ -69,23 +69,6 @@ class ParseAndFilter:
 		val, meta = msg
 		for record in self.parser(val):
 			return self.filter(record, meta), meta
-
-
-## message validation/processing
-
-def validate_and_process(msgs):
-	for msg in msgs:
-		if msg.error() is None:
-			# unpack and copy so we don't pickle the world (if multiprocessing)
-			yield (
-				msg.value(),
-				Metadata(msg.topic(), msg.partition(), msg.offset(), msg.timestamp()[1], msg.key()),
-			)
-		elif msg.error().code() == KafkaError._PARTITION_EOF:
-			# silently skip _PARTITION_EOF messages
-			continue
-		else:
-			raise Exception(msg.error())
 
 
 ## URL parsing
@@ -173,6 +156,7 @@ class AlertBroker:
 		# whether to return metadata alongside message contents
 		self._metadata = metadata
 
+		self._idx = 0
 		self._buffer = {}		# local raw message buffer
 
 		self._consumed = {}		# locally consumed (not necessarily committe)
@@ -198,6 +182,30 @@ class AlertBroker:
 		if self.p:
 			self.p.flush()
 
+	def _validate_and_process(self, msgs):
+		# process incoming messages and check for errors
+		for msg in msgs:
+			if msg.error() is None:
+				# unpack and copy so we don't pickle the world (if multiprocessing)
+				yield (
+					msg.value(),
+					Metadata(
+						msg.topic(),
+						msg.partition(),
+						msg.offset(),
+						msg.timestamp()[1],
+						msg.key(),
+						self._idx,
+					),
+				)
+				self._idx += 1
+			elif msg.error().code() == KafkaError._PARTITION_EOF:
+				# silently skip _PARTITION_EOF messages
+				continue
+			else:
+				raise Exception(msg.error())
+
+
 	def _raw_stream(self, timeout):
 		last_msg_time = time.time()
 		while True:
@@ -208,7 +216,7 @@ class AlertBroker:
 				yield HEARTBEAT_SENTINEL
 			else:
 				# unpack messages and check for errors
-				yield list(validate_and_process(msgs))
+				yield list(self._validate_and_process(msgs))
 
 				# reset the timeout counter
 				last_msg_time = time.time()
