@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, io, time, argparse, string, signal, itertools, os.path
+import sys, io, time, string, signal, itertools, os.path
 import json, base64
 import fastavro, fastavro.write
 
@@ -94,7 +94,7 @@ def parse_kafka_url(val, allow_no_topic=False):
 		(groupid_brokers, topics) = val.split('/')
 	except ValueError:
 		if not allow_no_topic:
-			raise argparse.ArgumentError(self, f'A kafka:// url must be of the form kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].')
+			raise ValueError(f'A kafka:// url must be of the form kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].')
 		else:
 			groupid_brokers, topics = val, None
 
@@ -104,7 +104,7 @@ def parse_kafka_url(val, allow_no_topic=False):
 		(groupid, brokers) = (None, groupid_brokers)
 
 	topics = topics.split(',') if topics is not None else []
-	
+
 	return (groupid, brokers, topics)
 
 
