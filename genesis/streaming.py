@@ -103,7 +103,7 @@ class AlertBroker:
 	c = None
 	p = None
 
-	def __init__(self, broker_url, mode='r', start_at='latest', format='avro', metadata=False, config=None):
+	def __init__(self, broker_url, mode='r', start_at='latest', format='avro', auth=None, metadata=False, config=None):
 		self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
 
 		# mode can be 'r', 'w', or 'rw'; other characters are ignored
@@ -130,6 +130,10 @@ class AlertBroker:
 					parser = configparser.ConfigParser()
 					parser.read_string("[root]\n" + fp.read())
 					cfg = dict(parser["root"])
+
+		# load authentication settings, if given
+		if auth:
+			cfg = {**cfg, **auth()}
 
 		if 'r' in mode:
 			ccfg={ **cfg,
