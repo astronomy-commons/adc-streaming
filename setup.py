@@ -45,13 +45,21 @@ def git_version():
             # Number of commits since the beginning of the current branch
             count = check_output("git rev-list --count HEAD".split()).decode('utf-8').strip()
 
-      # this will be a .dev version; increment the patchlevel
-      xyz = (tag.split('.') + [ '0', '0' ])[:3]
-      xyz[-1] = str( int(xyz[-1]) + 1 )
-      tag = '.'.join(xyz)
+      # this will be a .dev version; assume the version is of the form
+      # major[.minor[.patchlevel]], and increment the patchlevel by 1.
+      (major, minor, patchlevel) = (tag + ".0.0").split('.')[:3] # because minor and/or patchlevel are optional
+      patchlevel = str( int(patchlevel) + 1 )
+      tag = '.'.join((major, minor, patchlevel))
 
-      fmt = '{tag}.dev{commitcount}+{gitsha}'
-      return fmt.format(tag=tag, commitcount=count, gitsha=sha.lstrip('g'))
+      # if the working directory is dirty, append a '.dYYYYMMDD' tag
+      if dirty:
+            import time
+            dirtytag = time.strftime('.d%Y%m%d')
+      else:
+            dirtytag = ''
+
+      fmt = '{tag}.dev{commitcount}+g{gitsha}{dirtytag}'
+      return fmt.format(tag=tag, commitcount=count, gitsha=sha.lstrip('g'), dirtytag=dirtytag)
 
 
 setup(name='adc',
