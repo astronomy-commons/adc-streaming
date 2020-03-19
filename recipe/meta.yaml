@@ -19,6 +19,7 @@ requirements:
     - fastavro
     - python-confluent-kafka
     - tqdm
+    - certifi
 
 test:
   imports:

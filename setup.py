@@ -79,5 +79,5 @@ setup(name='adc',
       author_email='mjuric@astro.washington.edu',
       license='MIT',
       packages=['genesis'],
-      install_requires=['fastavro', 'confluent-kafka', 'tqdm'],
+      install_requires=['fastavro', 'confluent-kafka', 'certifi', 'tqdm'],
       zip_safe=False)
