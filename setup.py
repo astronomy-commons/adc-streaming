@@ -61,6 +61,24 @@ def git_version():
       fmt = '{tag}.dev{commitcount}+g{gitsha}{dirtytag}'
       return fmt.format(tag=tag, commitcount=count, gitsha=sha.lstrip('g'), dirtytag=dirtytag)
 
+# requirements
+install_requires = [
+      "fastavro",
+      "confluent-kafka",
+      "tqdm",
+      "certifi"
+]
+
+dev_requires = [
+      "black",
+      "flake8",
+      "flake8-black",
+      "pytest",
+      "sphinx",
+      "sphinx_rtd_theme",
+      "twine",
+]
+
 
 setup(name='adc',
       version=git_version(),
@@ -79,5 +97,8 @@ setup(name='adc',
       author_email='mjuric@astro.washington.edu',
       license='MIT',
       packages=['genesis'],
-      install_requires=['fastavro', 'confluent-kafka', 'certifi', 'tqdm'],
+      install_requires=install_requires,
+      extras_require={
+            "dev": dev_requires,
+      },
       zip_safe=False)
