@@ -1,4 +1,0 @@
-fastavro
-confluent-kafka
-tqdm
-twine
