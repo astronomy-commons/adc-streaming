@@ -4,100 +4,106 @@ from setuptools import setup
 ## Infer version from git tag information
 ##
 def git_version():
-      # Uses the following logic:
-      #
-      # * If the current commit has an annotated tags, the version is simply the tag with
-      #   the leading 'v' removed.
-      #
-      # * If the current commit is past an annotated tag, the version is constructed at:
-      #
-      #    '{tag+1}.dev{commitcount}+{gitsha}'
-      #
-      #  where {commitcount} is the number of commits after the tag (obtained with `git describe`)
-      #  and {tag+1} is the tag version incremented by one (i.e., if tag=0.0.1, it's 0.0.2). This
-      #  is needed because .dev tags compare as less than non-.dev tags, per PEP-440.
-      #
-      # * If there are no annotated tags in the past, the version is:
-      #
-      #    '0.0.0.dev{commitcount}+{gitsha}'
-      #
-      # Inspired by https://github.com/pyfidelity/setuptools-git-version
-      # Creates PEP-440 compliant versions
+    # Uses the following logic:
+    #
+    # * If the current commit has an annotated tags, the version is simply the tag with
+    #   the leading 'v' removed.
+    #
+    # * If the current commit is past an annotated tag, the version is constructed at:
+    #
+    #    '{tag+1}.dev{commitcount}+{gitsha}'
+    #
+    #  where {commitcount} is the number of commits after the tag (obtained with `git describe`)
+    #  and {tag+1} is the tag version incremented by one (i.e., if tag=0.0.1, it's 0.0.2). This
+    #  is needed because .dev tags compare as less than non-.dev tags, per PEP-440.
+    #
+    # * If there are no annotated tags in the past, the version is:
+    #
+    #    '0.0.0.dev{commitcount}+{gitsha}'
+    #
+    # Inspired by https://github.com/pyfidelity/setuptools-git-version
+    # Creates PEP-440 compliant versions
 
-      from subprocess import check_output
+    from subprocess import check_output
 
-      command = 'git describe --tags --long --dirty --always'
-      version = check_output(command.split()).decode('utf-8').strip()
+    command = "git describe --tags --long --dirty --always"
+    version = check_output(command.split()).decode("utf-8").strip()
 
-      parts = version.split('-')
-      if len(parts) in (3, 4):
-            dirty = len(parts) == 4
-            tag, count, sha = parts[:3]
-            if not tag.startswith('v'):
-                  raise Exception("Annotated tags on the repository must begin with the letter 'v'. Please fix this then try building agains.")
-            tag = tag[1:]
-            if count == '0' and not dirty:
-                  return tag
-      elif len(parts) in (1, 2):
-            tag = "0.0.0"
-            dirty = len(parts) == 2
-            sha = parts[0]
-            # Number of commits since the beginning of the current branch
-            count = check_output("git rev-list --count HEAD".split()).decode('utf-8').strip()
+    parts = version.split("-")
+    if len(parts) in (3, 4):
+        dirty = len(parts) == 4
+        tag, count, sha = parts[:3]
+        if not tag.startswith("v"):
+            raise Exception(
+                "Annotated tags on the repository must begin with the letter 'v'. Please fix this then try building agains."
+            )
+        tag = tag[1:]
+        if count == "0" and not dirty:
+            return tag
+    elif len(parts) in (1, 2):
+        tag = "0.0.0"
+        dirty = len(parts) == 2
+        sha = parts[0]
+        # Number of commits since the beginning of the current branch
+        count = (
+            check_output("git rev-list --count HEAD".split()).decode("utf-8").strip()
+        )
 
-      # this will be a .dev version; assume the version is of the form
-      # major[.minor[.patchlevel]], and increment the patchlevel by 1.
-      (major, minor, patchlevel) = (tag + ".0.0").split('.')[:3] # because minor and/or patchlevel are optional
-      patchlevel = str( int(patchlevel) + 1 )
-      tag = '.'.join((major, minor, patchlevel))
+    # this will be a .dev version; assume the version is of the form
+    # major[.minor[.patchlevel]], and increment the patchlevel by 1.
+    (major, minor, patchlevel) = (tag + ".0.0").split(".")[
+        :3
+    ]  # because minor and/or patchlevel are optional
+    patchlevel = str(int(patchlevel) + 1)
+    tag = ".".join((major, minor, patchlevel))
 
-      # if the working directory is dirty, append a '.dYYYYMMDD' tag
-      if dirty:
-            import time
-            dirtytag = time.strftime('.d%Y%m%d')
-      else:
-            dirtytag = ''
+    # if the working directory is dirty, append a '.dYYYYMMDD' tag
+    if dirty:
+        import time
 
-      fmt = '{tag}.dev{commitcount}+g{gitsha}{dirtytag}'
-      return fmt.format(tag=tag, commitcount=count, gitsha=sha.lstrip('g'), dirtytag=dirtytag)
+        dirtytag = time.strftime(".d%Y%m%d")
+    else:
+        dirtytag = ""
+
+    fmt = "{tag}.dev{commitcount}+g{gitsha}{dirtytag}"
+    return fmt.format(
+        tag=tag, commitcount=count, gitsha=sha.lstrip("g"), dirtytag=dirtytag
+    )
+
 
 # requirements
-install_requires = [
-      "fastavro",
-      "confluent-kafka",
-      "tqdm"
-]
+install_requires = ["fastavro", "confluent-kafka", "tqdm"]
 
 dev_requires = [
-      "black",
-      "flake8",
-      "flake8-black",
-      "pytest",
-      "sphinx",
-      "sphinx_rtd_theme",
-      "twine",
+    "black",
+    "flake8",
+    "flake8-black",
+    "pytest",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "twine",
 ]
 
 
-setup(name='adc',
-      version=git_version(),
-      description='Genesis Platform client libraries',
-      long_description=open("README.md").read(),
-      long_description_content_type="text/markdown",
-      url='https://github.com/astronomy-commons/genesis-client',
-      classifiers=[
-            "Programming Language :: Python :: 3",
-            "License :: OSI Approved :: BSD License",
-            "Development Status :: 3 - Alpha",
-            "Operating System :: POSIX :: Linux",
-            "Operating System :: MacOS :: MacOS X"
-      ],
-      author='Mario Juric',
-      author_email='mjuric@astro.washington.edu',
-      license='MIT',
-      packages=['genesis'],
-      install_requires=install_requires,
-      extras_require={
-            "dev": dev_requires,
-      },
-      zip_safe=False)
+setup(
+    name="adc",
+    version=git_version(),
+    description="Genesis Platform client libraries",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/astronomy-commons/genesis-client",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: BSD License",
+        "Development Status :: 3 - Alpha",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS :: MacOS X",
+    ],
+    author="Mario Juric",
+    author_email="mjuric@astro.washington.edu",
+    license="MIT",
+    packages=["genesis"],
+    install_requires=install_requires,
+    extras_require={"dev": dev_requires,},
+    zip_safe=False,
+)
