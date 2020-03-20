@@ -11,8 +11,8 @@ the repo directory. This will install all dependencies, including those using
 during development workflows.
 
 This project expects you to use a `pip`-centric workflow for development on the
-project itself. It gets released to conda, but we don't attempt to record
-development-time dependencies like linters through conda tools.
+project itself. If you're using conda, then use the conda environment's `pip` to
+install development dependencies, as described above.
 
 ### Code Workflow
 
