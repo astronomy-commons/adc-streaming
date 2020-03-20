@@ -31,8 +31,7 @@ lint :
 
 .PHONY: format
 format :
-# show diff via black
-	black . --diff
+	yapf --in-place --recursive .
 
 .PHONY: doc
 doc :

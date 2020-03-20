@@ -38,7 +38,6 @@ class SASLAuth(object):
         to the certificate.
 
     """
-
     def __init__(self, user, password, ssl=True, method=SASLMethod.PLAIN, **kwargs):
         self._method = method
 
