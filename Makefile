@@ -8,9 +8,11 @@ help :
 	@echo '  make format                run code formatter, giving a diff for recommended changes'
 	@echo '  make doc                   make documentation'
 	@echo '  make changelog             update changelog based on version'
-	@echo '  make dist                  make binary and source packages'
-	@echo '  make dist-check            verify binary and source packages'
-	@echo '  make upload                upload to PyPI'
+	@echo '  make pypi-dist             make binary and source packages for PyPI'
+	@echo '  make pypi-dist-check       verify binary and source packages for PyPI'
+	@echo '  make pypi-upload           upload to PyPI'
+	@echo '  make conda-build           make binary and source packages for conda-forge'
+	@echo '  make conda-upload          upload to conda-forge'
 	@echo
 
 VERSION ?= $(shell python setup.py --version)
@@ -41,14 +43,23 @@ changelog :
 	sed -i 's@## \[Unreleased]@## \[Unreleased]\n\n## \[$(VERSION)] - $(shell date +'%Y-%m-%d')@' CHANGELOG.md
 	sed -i 's@.*\[Unreleased]:.*@\[Unreleased]: $(REPO_URL)/compare/v$(VERSION)...HEAD\n[$(VERSION)]: $(REPO_URL)/releases/tag/v$(VERSION)@' CHANGELOG.md
 
-.PHONY: dist
-dist :
+
+.PHONY: pypi-dist
+pypi-dist :
 	python setup.py sdist bdist_wheel
 
-.PHONY: dist-check
-dist-check:
+.PHONY: pypi-dist-check
+pypi-dist-check:
 	twine check dist/*
 
-.PHONY: upload
-upload:
+.PHONY: pypi-upload
+pypi-upload:
 	twine upload dist/*
+
+.PHONY: conda-build
+conda-build:
+	conda build -c defaults -c conda-forge ./recipe
+
+.PHONY: conda-upload
+conda-upload:
+	anaconda upload $(shell conda build ./recipe --output)
