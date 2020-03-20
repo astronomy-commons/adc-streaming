@@ -5,7 +5,7 @@ help :
 	@echo
 	@echo '  make test                  run unit tests'
 	@echo '  make lint                  run linter'
-	@echo '  make format                run code formatter, giving a diff for recommended changes'
+	@echo '  make format                run code formatter'
 	@echo '  make doc                   make documentation'
 	@echo '  make changelog             update changelog based on version'
 	@echo '  make pypi-dist             make binary and source packages for PyPI'
@@ -31,8 +31,7 @@ lint :
 
 .PHONY: format
 format :
-# show diff via black
-	black . --diff
+	autopep8 --recursive --in-place .
 
 .PHONY: doc
 doc :
