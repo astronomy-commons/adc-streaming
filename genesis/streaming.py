@@ -6,9 +6,8 @@ import time
 import string
 import signal
 import itertools
-import os.path
+import functools
 import json
-import base64
 import fastavro
 import fastavro.write
 
@@ -20,7 +19,8 @@ import configparser
 
 from multiprocessing import Pool as MPPool
 
-# FIXME: Make this into a proper class (safety in the unlikely case the user returns HEARTBEAT_SENTINEL)
+# FIXME: Make this into a proper class (safety in the unlikely case the user
+# returns HEARTBEAT_SENTINEL)
 HEARTBEAT_SENTINEL = "__heartbeat__"
 
 
@@ -103,7 +103,9 @@ def parse_kafka_url(val, allow_no_topic=False):
     except ValueError:
         if not allow_no_topic:
             raise ValueError(
-                f'A kafka:// url must be of the form kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].')
+                'A kafka:// url must be of the form '
+                + 'kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].'
+            )
         else:
             groupid_brokers, topics = val, None
 
@@ -125,7 +127,8 @@ class AlertBroker:
     c = None
     p = None
 
-    def __init__(self, broker_url, mode='r', start_at='latest', format='avro', auth=None, metadata=False, config=None):
+    def __init__(self, broker_url, mode='r', start_at='latest',
+                 format='avro', auth=None, metadata=False, config=None):
         self.groupid, self.brokers, self.topics = parse_kafka_url(broker_url)
 
         # mode can be 'r', 'w', or 'rw'; other characters are ignored
@@ -141,10 +144,9 @@ class AlertBroker:
             self.groupid = getpass.getuser() + '-' + \
                 ''.join(random.choice(string.ascii_uppercase + string.digits)
                         for _ in range(20))
-#			print(f"Generated fake groupid {self.groupid}")
 
-        # load librdkafka configuration file, if given
-        # configurable properties: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        # load librdkafka configuration file, if given configurable properties:
+        # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         cfg = dict()
         if config is not None:
             if isinstance(config, dict):
@@ -255,14 +257,14 @@ class AlertBroker:
 
     # returns a generator returning deserialized, user-processed messages
     def _filtered_stream(self, mapper, filter, timeout):
-        t_last = time.time()
-
         for msgs in itertools.chain([self._buffer.values()], self._raw_stream(timeout=timeout)):
             if not is_heartbeat(msgs):
                 self._buffer = dict(enumerate(msgs))
 
                 # process the messages on the workers
-                for i, (rec, meta) in enumerate(mapper(ParseAndFilter(parser=self._parser, filter=filter), msgs)):
+                filtered = ParseAndFilter(parser=self._parser, filter=filter)
+                mapped = mapper(filtered, msgs)
+                for i, (rec, meta) in enumerate(mapped):
                     # pop the message from the buffer, indicating we've processed it
                     del self._buffer[i]
 
@@ -288,7 +290,6 @@ class AlertBroker:
             print("COMMITTING", file=sys.stderr)
             tp = [TopicPartition(_topic, _part, _offs + 1)
                   for (_topic, _part), _offs in self._committed.items()]
-            #print("   TP=", tp)
             self.c.commit(offsets=tp)
 
             # drop all _committd offsets from _consumed; no need to commit them again if the user
@@ -325,11 +326,12 @@ class AlertBroker:
     # possibly executed on ncores and up to maxread values
     def __call__(self, filter=None, pool=None, progress=False, timeout=None, limit=None):
         if pool:
-            def mapper(fun, vec): return pool.imap(fun, vec, chunksize=100)
+            mapper = functools.partial(pool.imap, chunksize=100)
         else:
             mapper = map
 
-        yield from self._stream(filter, mapper=mapper, progress=progress, timeout=timeout, limit=limit)
+        yield from self._stream(filter, mapper=mapper, progress=progress,
+                                timeout=timeout, limit=limit)
 
     def __iter__(self):
         return self.__call__()
@@ -363,7 +365,9 @@ if __name__ == "__main__":
         from datetime import datetime
         with Pool(5) as workers:
             with AlertBroker("kafka://broker0.do.alerts.wtf/test6", start_at="earliest") as stream:
-                for nread, (idx, rec) in enumerate(stream(filter=my_filter, pool=workers, progress=True, timeout=10), start=1):
+                filtered = stream(filter=my_filter, pool=workers,
+                                  progress=True, timeout=10)
+                for nread, (idx, rec) in enumerate(filtered, start=1):
 
                     # do stuff
                     cd = rec.candidate
