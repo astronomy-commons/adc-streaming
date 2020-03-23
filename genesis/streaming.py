@@ -6,9 +6,7 @@ import time
 import string
 import signal
 import itertools
-import os.path
 import json
-import base64
 import fastavro
 import fastavro.write
 
