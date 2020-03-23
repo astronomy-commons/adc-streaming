@@ -143,7 +143,6 @@ class AlertBroker:
             self.groupid = getpass.getuser() + '-' + \
                 ''.join(random.choice(string.ascii_uppercase + string.digits)
                         for _ in range(20))
-#			print(f"Generated fake groupid {self.groupid}")
 
         # load librdkafka configuration file, if given configurable properties:
         # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -257,8 +256,6 @@ class AlertBroker:
 
     # returns a generator returning deserialized, user-processed messages
     def _filtered_stream(self, mapper, filter, timeout):
-        t_last = time.time()
-
         for msgs in itertools.chain([self._buffer.values()], self._raw_stream(timeout=timeout)):
             if not is_heartbeat(msgs):
                 self._buffer = dict(enumerate(msgs))
@@ -292,7 +289,6 @@ class AlertBroker:
             print("COMMITTING", file=sys.stderr)
             tp = [TopicPartition(_topic, _part, _offs + 1)
                   for (_topic, _part), _offs in self._committed.items()]
-            #print("   TP=", tp)
             self.c.commit(offsets=tp)
 
             # drop all _committd offsets from _consumed; no need to commit them again if the user
