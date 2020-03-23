@@ -6,6 +6,7 @@ import time
 import string
 import signal
 import itertools
+import functools
 import json
 import fastavro
 import fastavro.write
@@ -325,7 +326,7 @@ class AlertBroker:
     # possibly executed on ncores and up to maxread values
     def __call__(self, filter=None, pool=None, progress=False, timeout=None, limit=None):
         if pool:
-            def mapper(fun, vec): return pool.imap(fun, vec, chunksize=100)
+            mapper = functools.partial(pool.imap, chunksize=100)
         else:
             mapper = map
 
