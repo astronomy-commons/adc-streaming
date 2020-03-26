@@ -16,7 +16,7 @@ help :
 	@echo
 
 VERSION ?= $(shell python setup.py --version)
-REPO_URL = https://github.com/astronomy-commons/genesis-client
+REPO_URL = https://github.com/astronomy-commons/adc-streaming
 
 .PHONY: test
 test :
