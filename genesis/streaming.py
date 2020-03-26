@@ -19,6 +19,8 @@ import configparser
 
 from multiprocessing import Pool as MPPool
 
+from .kafka import parse_kafka_url
+
 # FIXME: Make this into a proper class (safety in the unlikely case the user
 # returns HEARTBEAT_SENTINEL)
 HEARTBEAT_SENTINEL = "__heartbeat__"
@@ -89,34 +91,6 @@ class ParseAndFilter:
         val, meta = msg
         for record in self.parser(val):
             return self.filter(record, meta), meta
-
-
-# URL parsing
-
-def parse_kafka_url(val, allow_no_topic=False):
-    assert val.startswith("kafka://")
-
-    val = val[len("kafka://"):]
-
-    try:
-        (groupid_brokers, topics) = val.split('/')
-    except ValueError:
-        if not allow_no_topic:
-            raise ValueError(
-                'A kafka:// url must be of the form '
-                + 'kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].'
-            )
-        else:
-            groupid_brokers, topics = val, None
-
-    try:
-        (groupid, brokers) = groupid_brokers.split('@')
-    except ValueError:
-        (groupid, brokers) = (None, groupid_brokers)
-
-    topics = topics.split(',') if topics is not None else []
-
-    return (groupid, brokers, topics)
 
 
 def open(url, mode='r', **kwargs):
