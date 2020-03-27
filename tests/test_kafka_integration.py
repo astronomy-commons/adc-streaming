@@ -113,6 +113,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             mode="rw",
             auth=self.auth,
             start_at="earliest",
+            format="blob",
         )
         # Push one message in...
         broker.write("can you hear me?")
