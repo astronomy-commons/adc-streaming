@@ -3,7 +3,6 @@ import logging
 import tempfile
 from datetime import timedelta
 import time
-import os.path
 
 import docker
 
@@ -47,7 +46,8 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         return exit_code == 0
 
     def get_broker_cert(self, container):
-        code, output = container.exec_run("/bin/cat /root/shared/tls/cacert.pem")
+        code, output = container.exec_run(
+            "/bin/cat /root/shared/tls/cacert.pem")
         if code != 0:
             raise AssertionError(b"failed to get broker cert:" + output)
         return output
@@ -101,7 +101,8 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         )
 
     def get_or_create_docker_network(self):
-        nets = self.docker_client.networks.list(names="genesis-integration-test")
+        nets = self.docker_client.networks.list(
+            names="genesis-integration-test")
         if nets:
             return nets[0]
         return self.docker_client.networks.create(name="genesis-integration-test")
