@@ -77,6 +77,7 @@ install_requires = [
 
 dev_requires = [
     "autopep8",
+    "docker",
     "flake8",
     "pytest",
     "sphinx",
