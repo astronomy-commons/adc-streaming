@@ -5,7 +5,7 @@ Installation
 .. contents::
    :local:
 
-You can install genesis-client either via pip, conda, or from source.
+You can install adc-streaming either via pip, conda, or from source.
 
 To install with pip:
 

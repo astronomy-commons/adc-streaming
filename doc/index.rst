@@ -1,4 +1,4 @@
-genesis-client documentation
+adc-streaming documentation
 ============================
 
 User's Guide
