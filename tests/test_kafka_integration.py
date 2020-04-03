@@ -3,15 +3,17 @@ import logging
 import tempfile
 from datetime import timedelta
 import time
+import pytest
 
 import docker
 
-import genesis.streaming
-import genesis.auth
+import adc.streaming
+import adc.auth
 
 logging.basicConfig(level=logging.INFO)
 
 
+@pytest.mark.integration_test
 class KafkaIntegrationTestCase(unittest.TestCase):
     docker_client = docker.from_env()
 
@@ -65,14 +67,14 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
         logging.info("setting up auth")
         self.certfile = tempfile.NamedTemporaryFile(
-            prefix="genesis-integration-test-",
+            prefix="adc-integration-test-",
             suffix=".pem",
             mode="w+b",
         )
         self.certfile.write(self.get_broker_cert(self.container))
         self.certfile.flush()
         logging.info(f"certfile written to {self.certfile.name}")
-        self.auth = genesis.auth.SASLAuth(
+        self.auth = adc.auth.SASLAuth(
             user="test", password="test-pass",
             ssl_ca_location=self.certfile.name,
         )
@@ -86,14 +88,14 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
     def get_or_create_container(self):
         containers = self.docker_client.containers.list(
-            filters={"name": "genesis-integration-test-server"},
+            filters={"name": "adc-integration-test-server"},
         )
         if containers:
             return containers[0]
 
         return self.docker_client.containers.run(
             image="scimma/server:latest",
-            name="genesis-integration-test-server",
+            name="adc-integration-test-server",
             detach=True,
             auto_remove=True,
             network=self.net.name,
@@ -102,13 +104,13 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
     def get_or_create_docker_network(self):
         nets = self.docker_client.networks.list(
-            names="genesis-integration-test")
+            names="adc-integration-test")
         if nets:
             return nets[0]
-        return self.docker_client.networks.create(name="genesis-integration-test")
+        return self.docker_client.networks.create(name="adc-integration-test")
 
     def test_round_trip(self):
-        broker = genesis.streaming.AlertBroker(
+        broker = adc.streaming.AlertBroker(
             broker_url="kafka://group@" + self.kafka_address + "/topic",
             mode="rw",
             auth=self.auth,

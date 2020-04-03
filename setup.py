@@ -80,6 +80,8 @@ dev_requires = [
     "docker",
     "flake8",
     "pytest",
+    "pytest-timeout",
+    "pytest-integration",
     "sphinx",
     "sphinx_rtd_theme",
     "twine",
