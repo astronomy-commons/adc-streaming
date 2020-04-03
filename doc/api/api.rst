@@ -1,6 +1,6 @@
 .. _api:
 
-genesis-client API
+adc-streaming API
 ##################
 
 .. toctree::

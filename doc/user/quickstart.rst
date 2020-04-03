@@ -9,9 +9,9 @@ Reading messages:
 
 .. code:: bash
 
-    import genesis.streaming as gs
+    import adc.streaming as as
 
-    with gs.open("kafka://bootstrap.server/topic", "r", format="json") as stream:
+    with as.open("kafka://bootstrap.server/topic", "r", format="json") as stream:
         for idx, msg in stream:
             print(f"id: {idx}, contents: {msg}")
 
@@ -19,7 +19,7 @@ Writing messages:
 
 .. code:: bash
 
-    import genesis.streaming as gs
+    import adc.streaming as as
 
     with gs.open("kafka://bootstrap.server/topic", "w", format="json") as stream:
         stream.write({"contents": "hello"})
