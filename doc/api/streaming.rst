@@ -1,7 +1,7 @@
 .. _streaming:
 
-genesis.streaming
+adc.streaming
 #####################
 
-.. automodule:: genesis.streaming
+.. automodule:: adc.streaming
     :members:

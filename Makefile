@@ -3,7 +3,8 @@ help :
 	@echo
 	@echo 'Commands:'
 	@echo
-	@echo '  make test                  run unit tests'
+	@echo '  make test                  run tests'
+	@echo '  make test-quick            run tests, but not integration tests'
 	@echo '  make lint                  run linter'
 	@echo '  make format                run code formatter'
 	@echo '  make doc                   make documentation'
@@ -16,11 +17,15 @@ help :
 	@echo
 
 VERSION ?= $(shell python setup.py --version)
-REPO_URL = https://github.com/astronomy-commons/genesis-client
+REPO_URL = https://github.com/astronomy-commons/adc-streaming
 
 .PHONY: test
 test :
 	python -m pytest -v
+
+.PHONY: test-quick
+test-quick :
+	python -m pytest -v --without-integration
 
 .PHONY: lint
 lint :

@@ -22,9 +22,9 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 # -- Project information -----------------------------------------------------
 
-project = u'genesis-client'
-copyright = u'2019, Mario Juric'
-author = u'Mario Juric'
+project = u'adc-streaming'
+copyright = u'2020, Astronomy Data Commons Team'
+author = u'Astronomy Data Commons Team'
 
 # The short X.Y version
 version = u''
@@ -121,7 +121,7 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'genesis-clientdoc'
+htmlhelp_basename = 'adc-streamingdoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -148,7 +148,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'genesis-client.tex', u'genesis-client Documentation',
+    (master_doc, 'adc-streaming.tex', u'adc-streaming Documentation',
      u'Mario Juric', 'manual'),
 ]
 
@@ -158,7 +158,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'genesis-client', u'genesis-client Documentation',
+    (master_doc, 'adc-streaming', u'adc-streaming Documentation',
      [author], 1)
 ]
 
@@ -169,8 +169,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'genesis-client', u'genesis-client Documentation',
-     author, 'genesis-client', 'One line description of project.',
+    (master_doc, 'adc-streaming', u'adc-streaming Documentation',
+     author, 'adc-streaming', 'One line description of project.',
      'Miscellaneous'),
 ]
 

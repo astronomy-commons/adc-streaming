@@ -77,20 +77,23 @@ install_requires = [
 
 dev_requires = [
     "autopep8",
+    "docker",
     "flake8",
     "pytest",
+    "pytest-timeout",
+    "pytest-integration",
     "sphinx",
     "sphinx_rtd_theme",
     "twine",
 ]
 
 
-setup(name='adc',
+setup(name='adc-streaming',
       version=git_version(),
-      description='Genesis Platform client libraries',
+      description='Astronomy Data Commons streaming client libraries',
       long_description=open("README.md").read(),
       long_description_content_type="text/markdown",
-      url='https://github.com/astronomy-commons/genesis-client',
+      url='https://github.com/astronomy-commons/adc-streaming',
       classifiers=[
           "Programming Language :: Python :: 3",
           "License :: OSI Approved :: BSD License",
@@ -98,10 +101,10 @@ setup(name='adc',
           "Operating System :: POSIX :: Linux",
           "Operating System :: MacOS :: MacOS X"
       ],
-      author='Mario Juric',
-      author_email='mjuric@astro.washington.edu',
-      license='MIT',
-      packages=['genesis'],
+      author='Astronomy Data Commons Team',
+      author_email='swnelson@uw.edu',
+      license='BSD',
+      packages=['adc'],
       install_requires=install_requires,
       extras_require={
           "dev": dev_requires,

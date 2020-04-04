@@ -1,7 +1,7 @@
 {% set data = load_setup_py_data() %}
 
 package:
-  name: adc
+  name: adc-streaming
   version: {{ data.get('version') }}
 
 source:
@@ -23,16 +23,16 @@ requirements:
 
 test:
   imports:
-    - genesis
-    - genesis.streaming
+    - adc
+    - adc.streaming
 
 build:
   noarch: python
   script: python setup.py install --single-version-externally-managed --record=record.txt
 
 about:
-  home: https://github.com/astronomy-commons/genesis-client
+  home: https://github.com/astronomy-commons/adc-streaming
   license: BSD
-  summary: 'Astronomy Data Commons Client Library'
+  summary: 'Astronomy Data Commons Streaming Client Library'
   description: |
-    This package installs the genesis client library
+    This package installs the ADC Streaming Client library

@@ -1,4 +1,4 @@
-from genesis import kafka
+from adc import kafka
 import unittest
 
 
