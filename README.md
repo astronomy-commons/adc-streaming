@@ -1,4 +1,4 @@
-# Astronomy Data Commons Genesis Client Libraries
+# Astronomy Data Commons Streaming Client Libraries
 
 Libraries making it easy to access astronomy data commons resources.
 
