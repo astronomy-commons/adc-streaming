@@ -138,7 +138,7 @@ class AlertBroker:
 
         if 'r' in mode:
             ccfg = {**cfg,
-                    'bootstrap.servers': self.brokers,
+                    'bootstrap.servers': ",".join(self.brokers),
                     'group.id': self.groupid,
                     'default.topic.config': {
                         'auto.offset.reset': start_at
@@ -153,7 +153,7 @@ class AlertBroker:
 
         if 'w' in mode:
             pcfg = {**cfg,
-                    'bootstrap.servers': self.brokers,
+                    'bootstrap.servers': ",".join(self.brokers),
                     }
             self.p = Producer(pcfg)
             # message serializer

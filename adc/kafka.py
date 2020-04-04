@@ -5,7 +5,7 @@ def parse_kafka_url(val):
     """Extracts the group ID, broker addresses, and topic names from a Kafka URL.
 
     The URL should be in this form:
-        ``kafka://[groupid@]broker[,broker2[,...]]/topic``
+        ``kafka://[groupid@]broker[,broker2[,...]]/topic[,topic2[,...]]``
 
     The returned group ID and topic may be None if they aren't in the URL.
 
@@ -22,7 +22,9 @@ def parse_kafka_url(val):
         group_id = None
         broker_addresses = split_netloc[0].split(",")
 
-    topic = parsed.path.lstrip("/")
-    if len(topic) == 0:
-        topic = None
-    return group_id, broker_addresses, topic
+    topics = parsed.path.lstrip("/")
+    if len(topics) == 0:
+        split_topics = None
+    else:
+        split_topics = topics.split(",")
+    return group_id, broker_addresses, split_topics
