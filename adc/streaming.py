@@ -152,6 +152,9 @@ class AlertBroker:
             self._parser = _MESSAGE_PARSERS[format]		# message deserializer
 
         if 'w' in mode:
+            if len(self.topics) > 1:
+                raise ValueError(f"an AlertBroker in write mode can only have " + \
+                                 f"one topic in its URL, but found {len(self.topics)} topics")
             pcfg = {**cfg,
                     'bootstrap.servers': ",".join(self.brokers),
                     }
