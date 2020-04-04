@@ -2,6 +2,7 @@ import unittest
 
 from adc.streaming import AlertBroker
 
+
 class TestAlertBrokerInitialization(unittest.TestCase):
     def test_producer_rejects_multitopic_urls(self):
         with self.assertRaises(ValueError):
