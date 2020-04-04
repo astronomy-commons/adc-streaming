@@ -14,18 +14,23 @@ This project expects you to use a `pip`-centric workflow for development on the
 project itself. If you're using conda, then use the conda environment's `pip` to
 install development dependencies, as described above.
 
+Integration tests require Docker to run a Kafka broker. The broker might have
+network problems on OSX if you use Docker Desktop; run the tests in a Linux
+virtual machine (like with VirtualBox) to get around this.
+
 ### Code Workflow
 
 Write code, making changes.
 
-Use `make format` to reformat your code to comply with
-[black](https://github.com/psf/black).
+Use `make format` to reformat your code to comply with PEP8.
 
 Use `make lint` to catch common mistakes.
 
-Use `make test` to run tests.
+Use `make test-quick` to run fast unit tests.
 
-Once satisfied with all three of those, push your changes and open a PR.
+Use `make test` to run the full slow test suite, including integration tests.
+
+Once satisfied with all four of those, push your changes and open a PR.
 
 ### Tag, build, and upload to PyPI and Conda
 
