@@ -19,6 +19,8 @@ import configparser
 
 from multiprocessing import Pool as MPPool
 
+from .kafka import parse_kafka_url
+
 # FIXME: Make this into a proper class (safety in the unlikely case the user
 # returns HEARTBEAT_SENTINEL)
 HEARTBEAT_SENTINEL = "__heartbeat__"
@@ -91,34 +93,6 @@ class ParseAndFilter:
             return self.filter(record, meta), meta
 
 
-# URL parsing
-
-def parse_kafka_url(val, allow_no_topic=False):
-    assert val.startswith("kafka://")
-
-    val = val[len("kafka://"):]
-
-    try:
-        (groupid_brokers, topics) = val.split('/')
-    except ValueError:
-        if not allow_no_topic:
-            raise ValueError(
-                'A kafka:// url must be of the form '
-                + 'kafka://[groupid@]broker[,broker2[,...]]/topicspec[,topicspec[,...]].'
-            )
-        else:
-            groupid_brokers, topics = val, None
-
-    try:
-        (groupid, brokers) = groupid_brokers.split('@')
-    except ValueError:
-        (groupid, brokers) = (None, groupid_brokers)
-
-    topics = topics.split(',') if topics is not None else []
-
-    return (groupid, brokers, topics)
-
-
 def open(url, mode='r', **kwargs):
     return AlertBroker(url, mode, **kwargs)
 
@@ -164,7 +138,7 @@ class AlertBroker:
 
         if 'r' in mode:
             ccfg = {**cfg,
-                    'bootstrap.servers': self.brokers,
+                    'bootstrap.servers': ",".join(self.brokers),
                     'group.id': self.groupid,
                     'default.topic.config': {
                         'auto.offset.reset': start_at
@@ -178,8 +152,11 @@ class AlertBroker:
             self._parser = _MESSAGE_PARSERS[format]		# message deserializer
 
         if 'w' in mode:
+            if len(self.topics) > 1:
+                raise ValueError(f"an AlertBroker in write mode can only have "
+                                 + f"one topic in its URL, but found {len(self.topics)} topics")
             pcfg = {**cfg,
-                    'bootstrap.servers': self.brokers,
+                    'bootstrap.servers': ",".join(self.brokers),
                     }
             self.p = Producer(pcfg)
             # message serializer

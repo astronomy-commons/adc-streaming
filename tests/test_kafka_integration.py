@@ -161,7 +161,9 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         )
         # Push one message in...
         broker.write("can you hear me?")
-        broker.flush()
+        enqueued = broker.flush()
+        # All messages should have been sent...
+        self.assertEqual(enqueued, 0)
 
         # ... and pull it back out.
         msgs = broker.c.consume(1, 5.0)
