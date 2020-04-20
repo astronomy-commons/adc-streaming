@@ -46,7 +46,7 @@ def parse_avro(val):
     with io.BytesIO(val) as fp:
         rr = fastavro.reader(fp)
         for record in rr:
-            yield rr
+            yield record
 
 
 def parse_json(val):
