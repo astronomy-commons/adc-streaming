@@ -11,6 +11,7 @@ import json
 import fastavro
 import fastavro.write
 
+import confluent_kafka
 from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
 from contextlib import contextmanager
 from collections import namedtuple
