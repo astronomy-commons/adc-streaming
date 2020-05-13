@@ -14,6 +14,7 @@ import fastavro.write
 from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
 from contextlib import contextmanager
 from collections import namedtuple
+import certifi
 
 import configparser
 
@@ -122,6 +123,11 @@ class AlertBroker:
         # load librdkafka configuration file, if given configurable properties:
         # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         cfg = dict()
+
+        # Use certifi's SSL certificates by default. This can get overwritten by
+        # later config loading.
+        cfg["ssl.ca.location"] = certifi.where()
+
         if config is not None:
             if isinstance(config, dict):
                 cfg = config
@@ -153,7 +159,7 @@ class AlertBroker:
 
         if 'w' in mode:
             if len(self.topics) > 1:
-                raise ValueError(f"an AlertBroker in write mode can only have "
+                raise ValueError("an AlertBroker in write mode can only have "
                                  + f"one topic in its URL, but found {len(self.topics)} topics")
             pcfg = {**cfg,
                     'bootstrap.servers': ",".join(self.brokers),
