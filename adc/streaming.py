@@ -11,6 +11,7 @@ import json
 import fastavro
 import fastavro.write
 
+import confluent_kafka
 from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
 from contextlib import contextmanager
 from collections import namedtuple
@@ -25,6 +26,9 @@ from .kafka import parse_kafka_url
 # FIXME: Make this into a proper class (safety in the unlikely case the user
 # returns HEARTBEAT_SENTINEL)
 HEARTBEAT_SENTINEL = "__heartbeat__"
+
+import logging
+logger = logging.getLogger("adc-streaming")
 
 
 def is_heartbeat(msg):
@@ -137,6 +141,8 @@ class AlertBroker:
                     parser = configparser.ConfigParser()
                     parser.read_string("[root]\n" + fp.read())
                     cfg = dict(parser["root"])
+
+        cfg["error_cb"] = _error_callback
 
         # load authentication settings, if given
         if auth:
@@ -383,3 +389,43 @@ if __name__ == "__main__":
             stream.commit(defer=False)
     except KeyboardInterrupt:
         pass
+
+
+def _error_callback(kafka_error):
+    """Callback which fires when confluent_kafka producer or consumer
+    encounters an asynchronous error.
+
+    Raises
+    ------
+    `confluent_kafka.KafkaError`
+        Reraised from confluent_kafka.
+    """
+    if kafka_error.code() == confluent_kafka.KafkaError._ALL_BROKERS_DOWN:
+        # This error occurs very frequently. It's not nearly as fatal as it
+        # sounds: it really indicates that the client's broker metadata has
+        # timed out. It appears to get triggered in races during client
+        # shutdown, too. See https://github.com/edenhill/librdkafka/issues/2543
+        # for more background.
+        logger.warn("client is currently disconnected from all brokers")
+    else:
+        logger.error(f"internal kafka error: {kafka_error}")
+        raise(KafkaException.from_kafka_error(kafka_error))
+
+
+
+def _delivery_callback(kafka_error, msg):
+    if kafka_error is not None:
+        logger.error(f"delivery error: {kafka_error}")
+        raise(KafkaException.from_kafka_error(kafka_error))
+
+
+class KafkaException(Exception):
+    @classmethod
+    def from_kafka_error(cls, error):
+        return cls(error.name(), error.str())
+
+    def __init__(self, name, message):
+        self.name = name
+        self.message = message
+        msg = f"Error communicating with Kafka: code={name} {message}"
+        super(KafkaException, self).__init__(msg)
