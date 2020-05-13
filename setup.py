@@ -72,7 +72,7 @@ install_requires = [
     "fastavro",
     "confluent-kafka",
     "tqdm",
-    "certifi"
+    "certifi>=2020.04.05.1"
 ]
 
 dev_requires = [
