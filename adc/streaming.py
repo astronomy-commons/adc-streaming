@@ -128,10 +128,6 @@ class AlertBroker:
         # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         cfg = dict()
 
-        # Use certifi's SSL certificates by default. This can get overwritten by
-        # later config loading.
-        cfg["ssl.ca.location"] = certifi.where()
-
         if config is not None:
             if isinstance(config, dict):
                 cfg = config
@@ -147,6 +143,9 @@ class AlertBroker:
         # load authentication settings, if given
         if auth:
             cfg = {**cfg, **auth()}
+
+        if "ssl.ca.location" not in cfg:
+            cfg["ssl.ca.location"] = certifi.where()
 
         if 'r' in mode:
             ccfg = {**cfg,
