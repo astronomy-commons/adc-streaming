@@ -9,6 +9,7 @@ import functools
 import json
 import fastavro
 import fastavro.write
+import logging
 
 import confluent_kafka
 from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
@@ -23,7 +24,7 @@ from .kafka import parse_kafka_url
 # returns HEARTBEAT_SENTINEL)
 HEARTBEAT_SENTINEL = "__heartbeat__"
 
-import logging
+
 logger = logging.getLogger("adc-streaming")
 
 
@@ -342,7 +343,6 @@ def _error_callback(kafka_error):
     else:
         logger.error(f"internal kafka error: {kafka_error}")
         raise(KafkaException.from_kafka_error(kafka_error))
-
 
 
 def _delivery_callback(kafka_error, msg):
