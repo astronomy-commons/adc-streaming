@@ -365,26 +365,6 @@ if __name__ == "__main__":
                     stream.commit()
                 stream.commit(defer=False)
 
-        # with AlertBroker("kafka://broker0.do.alerts.wtf/test8", start_at="earliest") as stream:
-        # 	for nread, (idx, rec) in enumerate(stream(progress=True, timeout=2), start=1):
-
-        # 		## do stuff
-        # 		cd = rec.candidate
-        # 		print(f"[{datetime.now()}] {nread}/{idx}:", cd.jd, cd.ssdistnr, cd.ssnamenr)
-
-        # 		stream.commit()
-
-        # 		if nread == 10:
-        # 			break
-
-        # 	print("OUTSEDE")
-        # 	print("GOING IN")
-
-        # 	for nread, (idx, rec) in enumerate(stream(progress=True, timeout=10), start=1):
-        # 		cd = rec.candidate
-        # 		print(f"[{datetime.now()}] {nread}/{idx}:", cd.jd, cd.ssdistnr, cd.ssnamenr)
-        # 		stream.commit()
-
             stream.commit(defer=False)
     except KeyboardInterrupt:
         pass
