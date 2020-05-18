@@ -4,7 +4,6 @@ import sys
 import io
 import time
 import string
-import signal
 import itertools
 import functools
 import json
@@ -13,13 +12,10 @@ import fastavro.write
 
 import confluent_kafka
 from confluent_kafka import Consumer, KafkaError, TopicPartition, Producer
-from contextlib import contextmanager
 from collections import namedtuple
 import certifi
 
 import configparser
-
-from multiprocessing import Pool as MPPool
 
 from .kafka import parse_kafka_url
 
@@ -325,43 +321,6 @@ class AlertBroker:
 
     def flush(self):
         return self.p.flush()
-
-
-@contextmanager
-def Pool(*args, **kwarg):
-    original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    p = MPPool(*args, **kwarg)
-    signal.signal(signal.SIGINT, original_sigint_handler)
-    try:
-        yield p
-    finally:
-        p.close()
-
-
-if __name__ == "__main__":
-    def my_filter(msg):
-        # return msg
-        return None if msg.candidate.ssnamenr == 'null' else msg
-
-    try:
-        from datetime import datetime
-        with Pool(5) as workers:
-            with AlertBroker("kafka://broker0.do.alerts.wtf/test6", start_at="earliest") as stream:
-                filtered = stream(filter=my_filter, pool=workers,
-                                  progress=True, timeout=10)
-                for nread, (idx, rec) in enumerate(filtered, start=1):
-
-                    # do stuff
-                    cd = rec.candidate
-                    print(f"[{datetime.now()}] {nread}/{idx}:",
-                          cd.jd, cd.ssdistnr, cd.ssnamenr)
-
-                    stream.commit()
-                stream.commit(defer=False)
-
-            stream.commit(defer=False)
-    except KeyboardInterrupt:
-        pass
 
 
 def _error_callback(kafka_error):
