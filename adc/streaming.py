@@ -41,8 +41,6 @@ assert is_heartbeat(HEARTBEAT_SENTINEL)
 def _noop(msg, meta):
     return msg
 
-# Message parsing
-
 
 Metadata = namedtuple("Metadata", "topic partition offset timestamp key idx")
 
@@ -68,8 +66,6 @@ _MESSAGE_PARSERS = {
     'blob': parse_blob
 }
 
-# Message serialization
-
 
 def serialize_json(val):
     return json.dumps(val)
@@ -84,8 +80,6 @@ _MESSAGE_SERIALIZERS = {
     'blob': serialize_blob
 }
 
-
-##
 
 class ParseAndFilter:
     def __init__(self, parser, filter):
