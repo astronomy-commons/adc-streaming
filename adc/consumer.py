@@ -5,6 +5,7 @@ import enum
 import logging
 
 import confluent_kafka  # type: ignore
+import confluent_kafka.admin  # type: ignore
 
 from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
@@ -52,8 +53,8 @@ class Consumer:
     def describe_topic(
             self,
             topic: str,
-            timeout: timedelta = timedelta(seconds=5.0)) -> confluent_kafka.TopicMetadata:
-        """Fetch confluent_kafka.TopicMetadata describing a topic.
+            timeout: timedelta = timedelta(seconds=5.0)) -> confluent_kafka.admin.TopicMetadata:
+        """Fetch confluent_kafka.admin.TopicMetadata describing a topic.
         """
         self.logger.debug(f"fetching cluster metadata to describe topic name={topic}")
         cluster_meta = self._consumer.list_topics(timeout=timeout.total_seconds())
