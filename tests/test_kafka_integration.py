@@ -7,10 +7,11 @@ import pytest
 
 import docker
 
-import adc.streaming
-import adc.auth
+import adc.consumer
+import adc.producer
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("adc-streaming").setLevel(logging.DEBUG)
 
 
 @pytest.mark.integration_test
@@ -115,6 +116,12 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         logging.info("tearing down network")
         self.net.remove()
 
+    def exec_in_container(self, cmd):
+        exit_code, output = self.container.exec_run(cmd)
+        msg = f"Exit error running {cmd}: {output}"
+        self.assertEqual(exit_code, 0, msg)
+        return output
+
     def get_or_create_container(self):
         """Starts a scimma/server container named 'adc-integration-test-server' and
         returns a handle referencing the container. If a container with that
@@ -152,29 +159,32 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         message back out.
 
         """
-        broker = adc.streaming.AlertBroker(
-            broker_url="kafka://group@" + self.kafka_address + "/topic",
-            mode="rw",
+        topic = "test_round_trip"
+
+        producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[self.kafka_address],
+            topic=topic,
             auth=self.auth,
-            start_at="earliest",
-            format="blob",
-        )
+        ))
+
         # Push one message in...
-        broker.write("can you hear me?")
-        enqueued = broker.flush()
+        producer.write("can you hear me?")
+        enqueued = producer.flush()
         # All messages should have been sent...
         self.assertEqual(enqueued, 0)
 
         # ... and pull it back out.
-        msgs = broker.c.consume(1, 5.0)
-        self.assertTrue(len(msgs) != 0)
-        msg = msgs[0]
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka_address],
+            group_id="test_consumer",
+            auth=self.auth,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        msg = next(stream)
         if msg.error() is not None:
             raise Exception(msg.error())
 
-        self.assertEqual(msg.topic(), "topic")
+        self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"can you hear me?")
-
-        # FIXME: The following is how the API *should* work, but fails consistently.
-        # have = next(broker(timeout=1))
-        # self.assertEqual(have, "can you hear me?")
