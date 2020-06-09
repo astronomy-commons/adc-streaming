@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Iterable, Optional, Union
+from typing import Dict, List, Optional, Union
 import abc
 import dataclasses
 import logging
@@ -52,8 +52,8 @@ class Producer:
 @dataclasses.dataclass
 class ProducerConfig:
     broker_urls: List[str]
-    auth: Optional[SASLAuth]
     topic: str
+    auth: Optional[SASLAuth] = None
     delivery_callback: Optional[DeliveryCallback] = log_delivery_errors
     error_callback: Optional[ErrorCallback] = log_client_errors
 

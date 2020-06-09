@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Union, Iterable, List
-
 import confluent_kafka
 
 from adc import producer, consumer, kafka
@@ -35,8 +34,9 @@ def _open_consumer(
 
     client.close()
 
-def _open_producer(broker_addresses: List[str], topic: str) -> producer.Producer):
+
+def _open_producer(broker_addresses: List[str], topic: str) -> producer.Producer:
     return producer.Producer(producer.ProducerConfig(
-        broker_urls: broker_addresses,
-        topic: topic,
+        broker_urls=broker_addresses,
+        topic=topic,
     ))
