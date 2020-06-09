@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, List, Optional, Union
 import abc
 import dataclasses
@@ -12,17 +10,17 @@ from .errors import ErrorCallback, DeliveryCallback, log_client_errors, log_deli
 
 
 class Producer:
-    conf: ProducerConfig
+    conf: 'ProducerConfig'
     _producer: confluent_kafka.Producer
     logger: logging.Logger
 
-    def __init__(self, conf: ProducerConfig) -> None:
+    def __init__(self, conf: 'ProducerConfig') -> None:
         self.logger = logging.getLogger("adc-streaming.producer")
         self.conf = conf
         self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
 
     def write(self,
-              msg: Union[bytes, Serializable],
+              msg: Union[bytes, 'Serializable'],
               cb: Optional[DeliveryCallback] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
@@ -38,7 +36,7 @@ class Producer:
     def close(self) -> None:
         self.flush()
 
-    def __enter__(self) -> Producer:
+    def __enter__(self) -> 'Producer':
         return self
 
     def __exit__(self, type, value, traceback) -> bool:

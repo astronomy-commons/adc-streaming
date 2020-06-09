@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Callable
 import logging
 import confluent_kafka  # type: ignore

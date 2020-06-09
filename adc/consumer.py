@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, List, Optional, Iterator, Set
 import dataclasses
 from datetime import timedelta
@@ -13,11 +11,11 @@ from .errors import ErrorCallback, log_client_errors
 
 
 class Consumer:
-    conf: ConsumerConfig
+    conf: 'ConsumerConfig'
     _consumer: confluent_kafka.Consumer
     logger: logging.Logger
 
-    def __init__(self, conf: ConsumerConfig) -> None:
+    def __init__(self, conf: 'ConsumerConfig') -> None:
         self.logger = logging.getLogger("adc-streaming.consumer")
         self.conf = conf
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
