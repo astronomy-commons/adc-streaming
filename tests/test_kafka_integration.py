@@ -183,8 +183,6 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         stream = consumer.message_stream()
 
         msg = next(stream)
-        if msg.error() is not None:
-            raise Exception(msg.error())
+        self.assertEqual(msg.topic, topic)
+        self.assertEqual(msg.value, b"can you hear me?")
 
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"can you hear me?")

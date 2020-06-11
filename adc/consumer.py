@@ -9,15 +9,19 @@ import confluent_kafka.admin  # type: ignore
 
 from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
+from .message import KafkaMessage
+from .codecs import KafkaCodec, RawCodec
 
 
 class Consumer:
     conf: 'ConsumerConfig'
+    codec: KafkaCodec
     _consumer: confluent_kafka.Consumer
     logger: logging.Logger
 
-    def __init__(self, conf: 'ConsumerConfig') -> None:
+    def __init__(self, conf: 'ConsumerConfig', codec: KafkaCodec = RawCodec()) -> None:
         self.logger = logging.getLogger("adc-streaming.consumer")
+        self.codec = codec
         self.conf = conf
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
 
@@ -64,19 +68,21 @@ class Consumer:
         self.logger.debug(f"cluster metadata: {cluster_meta.topics}")
         return cluster_meta.topics[topic]
 
-    def mark_done(self, msg: confluent_kafka.Message):
+    def mark_done(self, msg: KafkaMessage):
         """
         Mark a message as fully-processed. In the background, the client will
         continuously synchronize this information with Kafka so that the stream can be
         resumed from this point in the future.
         """
-        self._consumer.store_offsets(msg)
+        self._consumer.store_offsets(
+            offsets=[confluent_kafka.TopicPartition(msg.topic, msg.partition, msg.offset)]
+        )
 
     def message_stream(self,
                        autocommit: bool = True,
                        batch_size: int = 100,
                        batch_timeout: timedelta = timedelta(seconds=1.0),
-                       ) -> Iterator[confluent_kafka.Message]:
+                       ) -> Iterator[KafkaMessage]:
 
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
@@ -110,18 +116,20 @@ class Consumer:
             self.logger.debug(f"tracking until eof for topic={tp.topic} partition={tp.partition}")
             active_partitions[tp.topic].add(tp.partition)
 
-        last_message: confluent_kafka.Message = None
+        last_message: Optional[KafkaMessage] = None
         while len(active_partitions) > 0:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
             for m in messages:
                 err = m.error()
                 if err is None:
                     self.logger.debug(f"read message from partition {m.partition()}")
-                    yield m
+                    km = KafkaMessage._from_confluent_kafka(m)
+                    deserialized = self.codec.deserialize(km)
+                    yield deserialized
                     # Automatically mark message as processed, if desired
                     if autocommit and last_message is not None:
                         self.mark_done(last_message)
-                        last_message = m
+                        last_message = km
                 elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
                     self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
                     # Done with this partition, remove it
