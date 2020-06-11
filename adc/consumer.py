@@ -43,8 +43,11 @@ class Consumer:
             tp = confluent_kafka.TopicPartition(
                 topic=topic,
                 partition=partition_id,
-                offset=confluent_kafka.OFFSET_BEGINNING,
             )
+            if self.conf.start_at == ConsumerStartPosition.EARLIEST:
+                tp.offset = confluent_kafka.OFFSET_BEGINNING
+            else:
+                tp.offset = confluent_kafka.OFFSET_END
             assignment.append(tp)
 
         self.logger.debug("registering topic assignment")
