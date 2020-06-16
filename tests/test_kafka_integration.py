@@ -12,7 +12,7 @@ import adc.producer
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("adc-streaming").setLevel(logging.DEBUG)
-
+logger = logging.getLogger("adc-streaming.tests")
 
 @pytest.mark.integration_test
 class KafkaIntegrationTestCase(unittest.TestCase):
@@ -33,7 +33,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 """
         i = 0
         while (not self.query_kafka_broker_address()) and i < maxiter:
-            logging.info("polling to wait for container to acquire port...")
+            logger.info("polling to wait for container to acquire port...")
             time.sleep(sleep.total_seconds())
             i = i + 1
             self.container.reload()
@@ -54,7 +54,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         """Block until Kafka's network listener is accepting connections."""
         i = 0
         while (not self.query_kafka_active()) and i < maxiter:
-            logging.info("polling to wait for kafka to come online...")
+            logger.info("polling to wait for kafka to come online...")
             time.sleep(sleep.total_seconds())
             i = i + 1
         assert i < maxiter
@@ -85,17 +85,17 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         connecting to the broker.
 
         """
-        logging.info("setting up network")
+        logger.info("setting up network")
         self.net = self.get_or_create_docker_network()
-        logging.info("setting up container")
+        logger.info("setting up container")
         self.container = self.get_or_create_container()
-        logging.info("getting kafka address")
+        logger.info("getting kafka address")
         self.kafka_address = self.poll_for_kafka_broker_address()
 
-        logging.info("waiting for kafka to come online")
+        logger.info("waiting for kafka to come online")
         self.poll_for_kafka_active()
 
-        logging.info("setting up auth")
+        logger.info("setting up auth")
         self.certfile = tempfile.NamedTemporaryFile(
             prefix="adc-integration-test-",
             suffix=".pem",
@@ -103,7 +103,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         )
         self.certfile.write(self.get_broker_cert(self.container))
         self.certfile.flush()
-        logging.info(f"certfile written to {self.certfile.name}")
+        logger.info(f"certfile written to {self.certfile.name}")
         self.auth = adc.auth.SASLAuth(
             user="test", password="test-pass",
             ssl_ca_location=self.certfile.name,
@@ -111,9 +111,9 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.certfile.close()
-        logging.info("tearing down container")
+        logger.info("tearing down container")
         self.container.stop()
-        logging.info("tearing down network")
+        logger.info("tearing down network")
         self.net.remove()
 
     def exec_in_container(self, cmd):
@@ -188,3 +188,70 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"can you hear me?")
+
+    @unittest.skip("skipping due to bug in librdkafka")
+    def test_consume_from_end(self):
+        # Write a few messages.
+        topic = "test_consume_from_end"
+        producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[self.kafka_address],
+            topic=topic,
+            auth=self.auth,
+        ))
+        producer.write("message 1")
+        producer.write("message 2")
+        producer.write("message 3")
+        enqueued = producer.flush()
+        self.assertEqual(enqueued, 0)
+
+        # Start a consumer from the end position
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka_address],
+            group_id="test_consumer",
+            auth=self.auth,
+            start_at=adc.consumer.ConsumerStartPosition.LATEST,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        # Now add messages after the "end"
+        producer.write("message 4")
+        enqueued = producer.flush()
+        self.assertEqual(enqueued, 0)
+
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")
+
+    def test_consume_from_specified_offset(self):
+        self.skipTest("skipping due to bug in librdkafka")
+        # Write a few messages.
+        topic = "test_consume_from_end"
+        producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[self.kafka_address],
+            topic=topic,
+            auth=self.auth,
+        ))
+        producer.write("message 1")
+        producer.write("message 2")
+        producer.write("message 3")
+        producer.write("message 4")
+        enqueued = producer.flush()
+        self.assertEqual(enqueued, 0)
+
+        # Start a consumer from the third message (offset '2')
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka_address],
+            group_id="test_consumer",
+            auth=self.auth,
+            start_at=2,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 3")
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")

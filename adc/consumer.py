@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Iterator, Set
+from typing import Dict, List, Optional, Iterator, Set, Union
 import dataclasses
 from datetime import timedelta
 import enum
@@ -44,10 +44,25 @@ class Consumer:
                 topic=topic,
                 partition=partition_id,
             )
-            if self.conf.start_at == ConsumerStartPosition.EARLIEST:
+            # FIXME: This doesn't obey offsets stored in Kafka for existing groups.
+            if self.conf.start_at is ConsumerStartPosition.EARLIEST:
                 tp.offset = confluent_kafka.OFFSET_BEGINNING
-            else:
+            elif self.conf.start_at is ConsumerStartPosition.LATEST:
+                # FIXME: librdkafka has a bug in offset handling - it caches
+                # "OFFSET_END", and will repeatedly move to the end of the
+                # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
+                # it should get fixed in v1.5 of librdkafka.
+
+                librdkafka_version = confluent_kafka.libversion()[0]
+                if librdkafka_version < "1.5.0":
+                    self.logger.warn(
+                        f"In librdkafka before v1.5, LATEST offsets have buggy behavior; you may not "
+                        "receive data (your librdkafka version is {librdkafka_version}). See "
+                        "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
                 tp.offset = confluent_kafka.OFFSET_END
+            else:
+                tp.offset = self.conf.start_at
+
             assignment.append(tp)
 
         self.logger.debug("registering topic assignment")
@@ -153,8 +168,14 @@ class ConsumerConfig:
     group_id: str
 
     # When reading a topic for the first time, where should we start in the
-    # stream?
-    start_at: ConsumerStartPosition = ConsumerStartPosition.EARLIEST
+    # stream? Note that, if the topic has already been consumed under the
+    # provided group_id, then consumption will start after the last message that
+    # was marked done with consumer.mark_done, regardless of this setting. This
+    # is only used when the position in the stream is unknown.
+    #
+    # This can either be a logical offset via a ConsumerStartPosition value, or
+    # it can be a specific offset as an integer.
+    start_at: Union[ConsumerStartPosition, int] = ConsumerStartPosition.EARLIEST
 
     # Authentication package to pass in to read from Kafka.
     auth: Optional[SASLAuth] = None
