@@ -18,15 +18,18 @@ class Producer:
     def __init__(self, conf: 'ProducerConfig') -> None:
         self.logger = logging.getLogger("adc-streaming.producer")
         self.conf = conf
+        self.logger.debug(f"connecting to producer with config {conf._to_confluent_kafka()}")
         self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
 
     def write(self,
-              msg: Union[bytes, 'Serializable'],
-              cb: Optional[DeliveryCallback] = None) -> None:
+              msg: Union[bytes, 'Serializable']) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         self.logger.debug("writing message to %s", self.conf.topic)
-        self._producer.produce(self.conf.topic, msg, on_delivery=cb)
+        if self.conf.delivery_callback is not None:
+            self._producer.produce(self.conf.topic, msg, on_delivery=self.conf.delivery_callback)
+        else:
+            self._producer.produce(self.conf.topic, msg)
 
     def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
@@ -75,6 +78,8 @@ class ProducerConfig:
             "bootstrap.servers": ",".join(self.broker_urls),
             "message.timeout.ms": self.produce_timeout.total_seconds() * 1000.0,
         }
+        if self.error_callback is not None:
+            config["error_cb"] = self.error_callback
         if self.auth is not None:
             config.update(self.auth())
         return config
