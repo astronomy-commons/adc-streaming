@@ -27,7 +27,7 @@ def _open_consumer(
     for t in topics:
         client.subscribe(t)
 
-    for msg in client.message_stream():
+    for msg in client.stream():
         yield msg
 
     client.close()

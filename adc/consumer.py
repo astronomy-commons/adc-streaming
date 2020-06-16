@@ -87,11 +87,11 @@ class Consumer:
         """
         self._consumer.store_offsets(msg)
 
-    def message_stream(self,
-                       autocommit: bool = True,
-                       batch_size: int = 100,
-                       batch_timeout: timedelta = timedelta(seconds=1.0),
-                       ) -> Iterator[confluent_kafka.Message]:
+    def stream(self,
+               autocommit: bool = True,
+               batch_size: int = 100,
+               batch_timeout: timedelta = timedelta(seconds=1.0)
+    ) -> Iterator[confluent_kafka.Message]:
 
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
@@ -116,11 +116,11 @@ class Consumer:
 
         """
         if self.conf.read_forever:
-            return self._message_stream_forever(autocommit, batch_size, batch_timeout)
+            return self._stream_forever(autocommit, batch_size, batch_timeout)
         else:
-            return self._message_stream_until_eof(autocommit, batch_size, batch_timeout)
+            return self._stream_until_eof(autocommit, batch_size, batch_timeout)
 
-    def _message_stream_forever(self,
+    def _stream_forever(self,
                                 autocommit: bool = True,
                                 batch_size: int = 100,
                                 batch_timeout: timedelta = timedelta(seconds=1.0),
@@ -140,7 +140,7 @@ class Consumer:
                 else:
                     raise(confluent_kafka.KafkaException(err))
 
-    def _message_stream_until_eof(self,
+    def _stream_until_eof(self,
                                   autocommit: bool = True,
                                   batch_size: int = 100,
                                   batch_timeout: timedelta = timedelta(seconds=1.0),

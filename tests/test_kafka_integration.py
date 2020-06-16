@@ -48,7 +48,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             auth=self.kafka.auth,
         ))
         consumer.subscribe(topic)
-        stream = consumer.message_stream()
+        stream = consumer.stream()
 
         msg = next(stream)
         if msg.error() is not None:
@@ -75,7 +75,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             start_at=adc.consumer.ConsumerStartPosition.LATEST,
         ))
         consumer.subscribe(topic)
-        stream = consumer.message_stream()
+        stream = consumer.stream()
 
         # Now add messages after the "end"
         simple_write_msg(self.kafka, topic, "message 4")
@@ -102,7 +102,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             start_at=2,
         ))
         consumer.subscribe(topic)
-        stream = consumer.message_stream()
+        stream = consumer.stream()
 
         msg = next(stream)
         self.assertEqual(msg.topic(), topic)
@@ -122,7 +122,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             read_forever=False
         ))
         consumer.subscribe(topic)
-        stream = consumer.message_stream()
+        stream = consumer.stream()
 
         msg = next(stream)
         if msg.error() is not None:
