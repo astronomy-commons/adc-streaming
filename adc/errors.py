@@ -3,7 +3,7 @@ import logging
 import confluent_kafka  # type: ignore
 
 
-logger = logging.getLogger("adc-streamig")
+logger = logging.getLogger("adc-streaming")
 
 
 ErrorCallback = Callable[[confluent_kafka.KafkaError], None]
