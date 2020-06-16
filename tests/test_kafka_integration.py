@@ -4,6 +4,7 @@ import tempfile
 from datetime import timedelta
 import time
 import pytest
+from typing import List
 
 import docker
 
@@ -24,7 +25,150 @@ class KafkaIntegrationTestCase(unittest.TestCase):
     to come online.
 
     """
-    docker_client = docker.from_env()
+    @classmethod
+    def setUpClass(cls):
+        cls.kafka = KafkaDockerConnection()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.kafka.close()
+
+    def test_round_trip(self):
+        """Try writing a message into the Kafka broker, and try pulling the same
+        message back out.
+
+        """
+        topic = "test_round_trip"
+        # Push one message in...
+        simple_write_msg(self.kafka, topic, "can you hear me?")
+        # ... and pull it back out.
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        msg = next(stream)
+        if msg.error() is not None:
+            raise Exception(msg.error())
+
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"can you hear me?")
+
+    @unittest.skip("skipping due to bug in librdkafka")
+    def test_consume_from_end(self):
+        # Write a few messages.
+        topic = "test_consume_from_end"
+        simple_write_msgs(self.kafka, topic, [
+            "message 1",
+            "message 2",
+            "message 3",
+        ])
+
+        # Start a consumer from the end position
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            start_at=adc.consumer.ConsumerStartPosition.LATEST,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        # Now add messages after the "end"
+        simple_write_msg(self.kafka, topic, "message 4")
+
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")
+
+    def test_consume_from_specified_offset(self):
+        # Write a few messages.
+        topic = "test_consume_from_specified_offset"
+        simple_write_msgs(self.kafka, topic, [
+            "message 1",
+            "message 2",
+            "message 3",
+            "message 4",
+        ])
+
+        # Start a consumer from the third message (offset '2')
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            start_at=2,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 3")
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")
+
+    def test_consume_not_forever(self):
+        topic = "test_consume_not_forever"
+        simple_write_msg(self.kafka, topic, "message 1")
+
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            read_forever=False
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.message_stream()
+
+        msg = next(stream)
+        if msg.error() is not None:
+            raise Exception(msg.error())
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 1")
+        with self.assertRaises(StopIteration):
+            next(stream)
+
+
+class KafkaDockerConnection:
+    """Holds connection information for communicating with a Kafka broker running
+    inside a docker container.
+
+    """
+    def __init__(self):
+        """Starts a Docker container running a Kafka broker, waits for it to come
+        online, and prepares authentication credentials for connecting to the
+        broker.
+
+        """
+        self.docker_client = docker.from_env()
+
+        logger.info("setting up network")
+        self.net = self.get_or_create_docker_network()
+        logger.info("setting up container")
+        self.container = self.get_or_create_container()
+        logger.info("getting kafka address")
+        self.address = self.poll_for_kafka_broker_address()
+
+        logger.info("waiting for kafka to come online")
+        self.poll_for_kafka_active()
+
+        logger.info("setting up auth")
+        self.certfile = tempfile.NamedTemporaryFile(
+            prefix="adc-integration-test-",
+            suffix=".pem",
+            mode="w+b",
+        )
+        self.certfile.write(self.get_broker_cert(self.container))
+        self.certfile.flush()
+        logger.info(f"certfile written to {self.certfile.name}")
+        self.auth = adc.auth.SASLAuth(
+            user="test", password="test-pass",
+            ssl_ca_location=self.certfile.name,
+        )
 
     def poll_for_kafka_broker_address(self, maxiter=20, sleep=timedelta(milliseconds=500)):
         """Block until the Docker daemon tells us the IP and Port of the Kafa broker.
@@ -79,37 +223,10 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             raise AssertionError(b"failed to get broker cert:" + output)
         return output
 
-    def setUp(self):
-        """Runs all pre-test setup: starts a Docker container running a Kafka broker,
-        waits for it to come online, and prepares authentication credentials for
-        connecting to the broker.
+    def close(self):
+        """Closes open files, shuts down containers, and tears down the docker network.
 
         """
-        logger.info("setting up network")
-        self.net = self.get_or_create_docker_network()
-        logger.info("setting up container")
-        self.container = self.get_or_create_container()
-        logger.info("getting kafka address")
-        self.kafka_address = self.poll_for_kafka_broker_address()
-
-        logger.info("waiting for kafka to come online")
-        self.poll_for_kafka_active()
-
-        logger.info("setting up auth")
-        self.certfile = tempfile.NamedTemporaryFile(
-            prefix="adc-integration-test-",
-            suffix=".pem",
-            mode="w+b",
-        )
-        self.certfile.write(self.get_broker_cert(self.container))
-        self.certfile.flush()
-        logger.info(f"certfile written to {self.certfile.name}")
-        self.auth = adc.auth.SASLAuth(
-            user="test", password="test-pass",
-            ssl_ca_location=self.certfile.name,
-        )
-
-    def tearDown(self):
         self.certfile.close()
         logger.info("tearing down container")
         self.container.stop()
@@ -154,105 +271,22 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             return nets[0]
         return self.docker_client.networks.create(name="adc-integration-test")
 
-    def test_round_trip(self):
-        """Try writing a message into the Kafka broker, and try pulling the same
-        message back out.
 
-        """
-        topic = "test_round_trip"
-
-        producer = adc.producer.Producer(adc.producer.ProducerConfig(
-            broker_urls=[self.kafka_address],
+def simple_write_msg(conn: KafkaDockerConnection, topic: str, msg: str):
+    producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[conn.address],
             topic=topic,
-            auth=self.auth,
-        ))
+            auth=conn.auth,
+    ))
+    producer.write(msg)
+    producer.flush()
 
-        # Push one message in...
-        producer.write("can you hear me?")
-        enqueued = producer.flush()
-        # All messages should have been sent...
-        self.assertEqual(enqueued, 0)
-
-        # ... and pull it back out.
-        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
-            broker_urls=[self.kafka_address],
-            group_id="test_consumer",
-            auth=self.auth,
-        ))
-        consumer.subscribe(topic)
-        stream = consumer.message_stream()
-
-        msg = next(stream)
-        if msg.error() is not None:
-            raise Exception(msg.error())
-
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"can you hear me?")
-
-    @unittest.skip("skipping due to bug in librdkafka")
-    def test_consume_from_end(self):
-        # Write a few messages.
-        topic = "test_consume_from_end"
-        producer = adc.producer.Producer(adc.producer.ProducerConfig(
-            broker_urls=[self.kafka_address],
+def simple_write_msgs(conn: KafkaDockerConnection, topic: str, msgs: List[str]):
+    producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[conn.address],
             topic=topic,
-            auth=self.auth,
-        ))
-        producer.write("message 1")
-        producer.write("message 2")
-        producer.write("message 3")
-        enqueued = producer.flush()
-        self.assertEqual(enqueued, 0)
-
-        # Start a consumer from the end position
-        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
-            broker_urls=[self.kafka_address],
-            group_id="test_consumer",
-            auth=self.auth,
-            start_at=adc.consumer.ConsumerStartPosition.LATEST,
-            read_forever=False,
-        ))
-        consumer.subscribe(topic)
-        stream = consumer.message_stream()
-
-        # Now add messages after the "end"
-        producer.write("message 4")
-        enqueued = producer.flush()
-        self.assertEqual(enqueued, 0)
-
-        msg = next(stream)
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"message 4")
-
-    def test_consume_from_specified_offset(self):
-        self.skipTest("skipping due to bug in librdkafka")
-        # Write a few messages.
-        topic = "test_consume_from_end"
-        producer = adc.producer.Producer(adc.producer.ProducerConfig(
-            broker_urls=[self.kafka_address],
-            topic=topic,
-            auth=self.auth,
-        ))
-        producer.write("message 1")
-        producer.write("message 2")
-        producer.write("message 3")
-        producer.write("message 4")
-        enqueued = producer.flush()
-        self.assertEqual(enqueued, 0)
-
-        # Start a consumer from the third message (offset '2')
-        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
-            broker_urls=[self.kafka_address],
-            group_id="test_consumer",
-            auth=self.auth,
-            start_at=2,
-        ))
-        consumer.subscribe(topic)
-        stream = consumer.message_stream()
-
-        msg = next(stream)
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"message 3")
-        msg = next(stream)
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"message 4")
+            auth=conn.auth,
+    ))
+    for m in msgs:
+        producer.write(m)
+    producer.flush()
