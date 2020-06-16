@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Union
 import abc
 import dataclasses
 import logging
+from datetime import timedelta
 
 import confluent_kafka  # type: ignore
 
@@ -27,12 +28,12 @@ class Producer:
         self.logger.debug("writing message to %s", self.conf.topic)
         self._producer.produce(self.conf.topic, msg, on_delivery=cb)
 
-    def flush(self) -> int:
+    def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
         enqueued after the attempt.
 
         """
-        n = self._producer.flush()
+        n = self._producer.flush(timeout.total_seconds())
         if n > 0:
             self.logger.debug("flushed messages, %d still enqueued", n)
         else:
@@ -47,10 +48,14 @@ class Producer:
         return self
 
     def __exit__(self, type, value, traceback) -> bool:
-        self.close()
         if type == KeyboardInterrupt:
             print("Aborted (CTRL-C).")
             return True
+        if type is None and value is None and traceback is None:
+            n_unsent = self.close()
+            if n_unsent > 0:
+                raise Exception(f"{n_unsent} messages remain unsent, some data may have been lost!")
+            return False
         return False
 
 
@@ -62,9 +67,13 @@ class ProducerConfig:
     delivery_callback: Optional[DeliveryCallback] = log_delivery_errors
     error_callback: Optional[ErrorCallback] = log_client_errors
 
+    # produce_timeout sets the maximum amount of time that the backend can take
+    # to send a message to Kafka. Use a value of 0 to never timeout.
+    produce_timeout = timedelta(seconds=2)
     def _to_confluent_kafka(self) -> Dict:
         config = {
             "bootstrap.servers": ",".join(self.broker_urls),
+            "message.timeout.ms": self.produce_timeout.total_seconds() * 1000.0,
         }
         if self.auth is not None:
             config.update(self.auth())
