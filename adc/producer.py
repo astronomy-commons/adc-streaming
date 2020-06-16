@@ -24,6 +24,7 @@ class Producer:
               cb: Optional[DeliveryCallback] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
+        self.logger.debug("writing message to %s", self.conf.topic)
         self._producer.produce(self.conf.topic, msg, on_delivery=cb)
 
     def flush(self) -> int:
@@ -31,9 +32,15 @@ class Producer:
         enqueued after the attempt.
 
         """
-        return self._producer.flush()
+        n = self._producer.flush()
+        if n > 0:
+            self.logger.debug("flushed messages, %d still enqueued", n)
+        else:
+            self.logger.debug("flushed all messages")
+        return n
 
     def close(self) -> None:
+        self.logger.debug("shutting down")
         self.flush()
 
     def __enter__(self) -> 'Producer':
