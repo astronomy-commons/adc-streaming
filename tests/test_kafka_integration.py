@@ -210,6 +210,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             group_id="test_consumer",
             auth=self.auth,
             start_at=adc.consumer.ConsumerStartPosition.LATEST,
+            read_forever=False,
         ))
         consumer.subscribe(topic)
         stream = consumer.message_stream()

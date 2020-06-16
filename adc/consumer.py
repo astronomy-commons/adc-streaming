@@ -108,12 +108,43 @@ class Consumer:
         provide a full batch of batch_size messages. Higher values may be more
         efficient, but may add latency.
 
-        The stream stops when the client has hit the last message in all
-        partitions. This set of partitions is calculated just once when
-        iterate() is first called; calling subscribe() after iterate() may
-        cause inconsistent behavior.
+        If the consumer's configuration has read_forever set to False, then the
+        stream stops when the client has hit the last message in all partitions.
+        This set of partitions is calculated just once when iterate() is first
+        called; calling subscribe() after iterate() may cause inconsistent
+        behavior in this case.
 
         """
+        if self.conf.read_forever:
+            return self._message_stream_forever(autocommit, batch_size, batch_timeout)
+        else:
+            return self._message_stream_until_eof(autocommit, batch_size, batch_timeout)
+
+    def _message_stream_forever(self,
+                                autocommit: bool = True,
+                                batch_size: int = 100,
+                                batch_timeout: timedelta = timedelta(seconds=1.0),
+                                ) -> Iterator[confluent_kafka.Message]:
+        last_message: confluent_kafka.Message = None
+        while True:
+            messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
+            for m in messages:
+                err = m.error()
+                if err is None:
+                    self.logger.debug(f"read message from partition {m.partition()}")
+                    yield m
+                    # Automatically mark message as processed, if desired
+                    if autocommit and last_message is not None:
+                        self.mark_done(last_message)
+                        last_message = m
+                else:
+                    raise(confluent_kafka.KafkaException(err))
+
+    def _message_stream_until_eof(self,
+                                  autocommit: bool = True,
+                                  batch_size: int = 100,
+                                  batch_timeout: timedelta = timedelta(seconds=1.0),
+                                  ) -> Iterator[confluent_kafka.Message]:
         assignment = self._consumer.assignment()
 
         # Make a map of topic-name -> set of partition IDs we're assigned to.
@@ -167,6 +198,10 @@ class ConsumerConfig:
     broker_urls: List[str]
     group_id: str
 
+    # When we have reached the last message on a topic, should we hold the
+    # stream open to wait for more messages?
+    read_forever: bool = True
+
     # When reading a topic for the first time, where should we start in the
     # stream? Note that, if the topic has already been consumed under the
     # provided group_id, then consumption will start after the last message that
@@ -191,14 +226,25 @@ class ConsumerConfig:
             "bootstrap.servers": ",".join(self.broker_urls),
             "error_cb": self.error_callback,
             "group.id": self.group_id,
-            "default.topic.config": {
-                "auto.offset.reset": str(self.start_at),
-            },
             "enable.auto.commit": True,
             "auto.commit.interval.ms": int(self.offset_commit_interval.total_seconds() * 1000),
             "enable.auto.offset.store": False,
             "queued.min.messages": 1000,
+            "enable.partition.eof": not self.read_forever,
         }
+        if self.start_at is ConsumerStartPosition.EARLIEST:
+            default_topic_config = config.get("default.topic.config", {})
+            default_topic_config = {
+                "auto.offset.reset": "EARLIEST",
+            }
+            config["default.topic.config"] = default_topic_config
+        elif self.start_at is ConsumerStartPosition.LATEST:
+            default_topic_config = config.get("default.topic.config", {})
+            default_topic_config = {
+                "auto.offset.reset": "LATEST",
+            }
+            config["default.topic.config"] = default_topic_config
+
         if self.auth is not None:
             config.update(self.auth())
         return config
