@@ -67,7 +67,6 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             "message 2",
             "message 3",
         ])
-
         # Start a consumer from the end position
         consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
             broker_urls=[self.kafka.address],

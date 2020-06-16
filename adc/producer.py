@@ -43,9 +43,9 @@ class Producer:
             self.logger.debug("flushed all messages")
         return n
 
-    def close(self) -> None:
-        self.logger.debug("shutting down")
-        self.flush()
+    def close(self) -> int:
+        self.logger.debug("shutting down producer")
+        return self.flush()
 
     def __enter__(self) -> 'Producer':
         return self
