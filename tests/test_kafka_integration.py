@@ -10,6 +10,7 @@ import docker
 
 import adc.consumer
 import adc.producer
+import adc.io
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("adc-streaming").setLevel(logging.DEBUG)
@@ -131,6 +132,26 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(msg.value(), b"message 1")
         with self.assertRaises(StopIteration):
             next(stream)
+
+    def test_contextmanager_support(self):
+        topic = "test_contextmanager_support"
+        url = f"kafka://{self.kafka.address}/{topic}"
+        with adc.io.open(url, mode="w", auth=self.kafka.auth) as p:
+            p.write("message 1")
+            p.write("message 2")
+            p.write("message 3")
+
+        logger.info("done with writes")
+
+        group = "test_contextmanager_group"
+        url = f"kafka://{group}@{self.kafka.address}/{topic}"
+        with adc.io.open(url, mode="r", auth=self.kafka.auth, read_forever=False) as stream:
+            messages = [m for m in stream]
+        logger.info("done with reads")
+        self.assertEqual(len(messages), 3)
+        self.assertEqual(messages[0].value(), b"message 1")
+        self.assertEqual(messages[1].value(), b"message 2")
+        self.assertEqual(messages[2].value(), b"message 3")
 
 
 class KafkaDockerConnection:
