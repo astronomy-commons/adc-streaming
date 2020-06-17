@@ -1,7 +1,7 @@
-from typing import Callable
 import logging
-import confluent_kafka  # type: ignore
+from typing import Callable
 
+import confluent_kafka  # type: ignore
 
 logger = logging.getLogger("adc-streaming")
 

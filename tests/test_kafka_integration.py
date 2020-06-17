@@ -1,16 +1,16 @@
-import unittest
 import logging
 import tempfile
-from datetime import timedelta
 import time
-import pytest
+import unittest
+from datetime import timedelta
 from typing import List
 
 import docker
+import pytest
 
 import adc.consumer
-import adc.producer
 import adc.io
+import adc.producer
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("adc-streaming").setLevel(logging.DEBUG)

@@ -1,13 +1,14 @@
-from typing import Dict, List, Optional, Union
 import abc
 import dataclasses
 import logging
 from datetime import timedelta
+from typing import Dict, List, Optional, Union
 
 import confluent_kafka  # type: ignore
 
 from .auth import SASLAuth
-from .errors import ErrorCallback, DeliveryCallback, log_client_errors, log_delivery_errors
+from .errors import (DeliveryCallback, ErrorCallback, log_client_errors,
+                     log_delivery_errors)
 
 
 class Producer:

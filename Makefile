@@ -37,6 +37,7 @@ lint :
 .PHONY: format
 format :
 	autopep8 --recursive --in-place .
+	isort
 
 .PHONY: doc
 doc :

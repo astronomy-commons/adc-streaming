@@ -1,5 +1,6 @@
-from adc import kafka
 import unittest
+
+from adc import kafka
 
 
 class TestKafkaURLParsing(unittest.TestCase):

@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional, Iterator, Set, Union
 import dataclasses
-from datetime import timedelta
 import enum
 import logging
+from datetime import timedelta
+from typing import Dict, Iterator, List, Optional, Set, Union
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore

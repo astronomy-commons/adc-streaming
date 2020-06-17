@@ -1,10 +1,11 @@
-from typing import Union, Iterable, List, Optional
-import confluent_kafka  # type: ignore
+import logging
 import warnings
 from contextlib import contextmanager
-import logging
+from typing import Iterable, List, Optional, Union
 
-from adc import producer, consumer, kafka, auth, errors
+import confluent_kafka  # type: ignore
+
+from adc import auth, consumer, errors, kafka, producer
 
 logger = logging.getLogger("adc-streaming")
 

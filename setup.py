@@ -80,6 +80,7 @@ dev_requires = [
     "autopep8",
     "docker",
     "flake8",
+    "isort",
     "pytest",
     "pytest-timeout",
     "pytest-integration",
