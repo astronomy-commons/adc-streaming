@@ -56,8 +56,8 @@ class Consumer:
                 librdkafka_version = confluent_kafka.libversion()[0]
                 if librdkafka_version < "1.5.0":
                     self.logger.warn(
-                        f"In librdkafka before v1.5, LATEST offsets have buggy behavior; you may not "
-                        "receive data (your librdkafka version is {librdkafka_version}). See "
+                        "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
+                        "not receive data (your librdkafka version is {librdkafka_version}). See "
                         "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
                 tp.offset = confluent_kafka.OFFSET_END
             else:
@@ -91,8 +91,7 @@ class Consumer:
                autocommit: bool = True,
                batch_size: int = 100,
                batch_timeout: timedelta = timedelta(seconds=1.0)
-    ) -> Iterator[confluent_kafka.Message]:
-
+               ) -> Iterator[confluent_kafka.Message]:
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
 
@@ -121,10 +120,10 @@ class Consumer:
             return self._stream_until_eof(autocommit, batch_size, batch_timeout)
 
     def _stream_forever(self,
-                                autocommit: bool = True,
-                                batch_size: int = 100,
-                                batch_timeout: timedelta = timedelta(seconds=1.0),
-                                ) -> Iterator[confluent_kafka.Message]:
+                        autocommit: bool = True,
+                        batch_size: int = 100,
+                        batch_timeout: timedelta = timedelta(seconds=1.0),
+                        ) -> Iterator[confluent_kafka.Message]:
         last_message: confluent_kafka.Message = None
         while True:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
@@ -141,10 +140,10 @@ class Consumer:
                     raise(confluent_kafka.KafkaException(err))
 
     def _stream_until_eof(self,
-                                  autocommit: bool = True,
-                                  batch_size: int = 100,
-                                  batch_timeout: timedelta = timedelta(seconds=1.0),
-                                  ) -> Iterator[confluent_kafka.Message]:
+                          autocommit: bool = True,
+                          batch_size: int = 100,
+                          batch_timeout: timedelta = timedelta(seconds=1.0),
+                          ) -> Iterator[confluent_kafka.Message]:
         assignment = self._consumer.assignment()
 
         # Make a map of topic-name -> set of partition IDs we're assigned to.

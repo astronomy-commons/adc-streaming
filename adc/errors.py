@@ -32,11 +32,13 @@ def log_delivery_errors(
         logger.error(f"delivery error: {kafka_error}")
 
 
-def raise_delivery_errors(kafka_error: confluent_kafka.KafkaError, msg: confluent_kafka.Message) -> None:
+def raise_delivery_errors(kafka_error: confluent_kafka.KafkaError,
+                          msg: confluent_kafka.Message) -> None:
     if kafka_error is not None:
         raise KafkaException.from_kafka_error(kafka_error)
     elif msg.error() is not None:
         raise KafkaException.from_kafka_error(msg.error())
+
 
 class KafkaException(Exception):
     @classmethod

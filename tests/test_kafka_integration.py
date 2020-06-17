@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("adc-streaming").setLevel(logging.DEBUG)
 logger = logging.getLogger("adc-streaming.tests")
 
+
 @pytest.mark.integration_test
 class KafkaIntegrationTestCase(unittest.TestCase):
     """This test runs a Kafka broker in a Docker container, and makes sure that
@@ -158,6 +159,7 @@ class KafkaDockerConnection:
     inside a docker container.
 
     """
+
     def __init__(self):
         """Starts a Docker container running a Kafka broker, waits for it to come
         online, and prepares authentication credentials for connecting to the
@@ -294,18 +296,19 @@ class KafkaDockerConnection:
 
 def simple_write_msg(conn: KafkaDockerConnection, topic: str, msg: str):
     producer = adc.producer.Producer(adc.producer.ProducerConfig(
-            broker_urls=[conn.address],
-            topic=topic,
-            auth=conn.auth,
+        broker_urls=[conn.address],
+        topic=topic,
+        auth=conn.auth,
     ))
     producer.write(msg)
     producer.flush()
 
+
 def simple_write_msgs(conn: KafkaDockerConnection, topic: str, msgs: List[str]):
     producer = adc.producer.Producer(adc.producer.ProducerConfig(
-            broker_urls=[conn.address],
-            topic=topic,
-            auth=conn.auth,
+        broker_urls=[conn.address],
+        topic=topic,
+        auth=conn.auth,
     ))
     for m in msgs:
         producer.write(m)

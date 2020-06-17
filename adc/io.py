@@ -1,5 +1,5 @@
 from typing import Union, Iterable, List, Optional
-import confluent_kafka
+import confluent_kafka  # type: ignore
 import warnings
 from contextlib import contextmanager
 import logging
@@ -12,9 +12,9 @@ logger = logging.getLogger("adc-streaming")
 def open(url: str,
          mode: str = 'r',
          auth: Optional[auth.SASLAuth] = None,
-         start_at: Union[consumer.ConsumerStartPosition, int] = consumer.ConsumerStartPosition.EARLIEST,
+         start_at: Union[consumer.ConsumerStartPosition, int] = consumer.ConsumerStartPosition.EARLIEST,  # noqa: E501
          read_forever: bool = True,
-) -> Union[producer.Producer, Iterable[confluent_kafka.Message]]:
+         ) -> Union[producer.Producer, Iterable[confluent_kafka.Message]]:
     group_id, broker_addresses, topics = kafka.parse_kafka_url(url)
     logger.debug("connecting to addresses=%s  group_id=%s  topics=%s",
                  broker_addresses, group_id, topics)
@@ -59,6 +59,7 @@ def _open_consumer(
         yield client.stream()
     finally:
         client.close()
+
 
 def _open_producer(
         broker_addresses: List[str],
