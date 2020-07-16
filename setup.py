@@ -69,7 +69,6 @@ def git_version():
 
 # requirements
 install_requires = [
-    "fastavro",
     "confluent-kafka",
     "dataclasses ; python_version < '3.7'",
     "tqdm",
