@@ -73,7 +73,7 @@ class ProducerConfig:
 
     # produce_timeout sets the maximum amount of time that the backend can take
     # to send a message to Kafka. Use a value of 0 to never timeout.
-    produce_timeout = timedelta(seconds=2)
+    produce_timeout = timedelta(seconds=10)
 
     def _to_confluent_kafka(self) -> Dict:
         config = {
