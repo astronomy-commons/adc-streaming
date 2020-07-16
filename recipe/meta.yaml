@@ -11,12 +11,10 @@ requirements:
   build:
     - pytest
     - python
-    - fastavro
     - python-confluent-kafka
     - tqdm
   run:
     - python
-    - fastavro
     - python-confluent-kafka
     - tqdm
     - certifi
