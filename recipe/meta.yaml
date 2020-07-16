@@ -22,7 +22,6 @@ requirements:
 test:
   imports:
     - adc
-    - adc.streaming
 
 build:
   noarch: python
