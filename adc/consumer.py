@@ -57,7 +57,7 @@ class Consumer:
                 if librdkafka_version < "1.5.0":
                     self.logger.warn(
                         "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
-                        "not receive data (your librdkafka version is {librdkafka_version}). See "
+                        f"not receive data (your librdkafka version is {librdkafka_version}). See "
                         "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
                 tp.offset = confluent_kafka.OFFSET_END
             else:
