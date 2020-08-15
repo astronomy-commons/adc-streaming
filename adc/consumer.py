@@ -44,24 +44,10 @@ class Consumer:
                 topic=topic,
                 partition=partition_id,
             )
-            # FIXME: This doesn't obey offsets stored in Kafka for existing groups.
-            if self.conf.start_at is ConsumerStartPosition.EARLIEST:
-                tp.offset = confluent_kafka.OFFSET_BEGINNING
-            elif self.conf.start_at is ConsumerStartPosition.LATEST:
-                # FIXME: librdkafka has a bug in offset handling - it caches
-                # "OFFSET_END", and will repeatedly move to the end of the
-                # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
-                # it should get fixed in v1.5 of librdkafka.
-
-                librdkafka_version = confluent_kafka.libversion()[0]
-                if librdkafka_version < "1.5.0":
-                    self.logger.warn(
-                        "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
-                        f"not receive data (your librdkafka version is {librdkafka_version}). See "
-                        "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
-                tp.offset = confluent_kafka.OFFSET_END
-            else:
-                tp.offset = self.conf.start_at
+            # Get the current offsets stored in Kafka. The high offset
+            # is the offset of the last message + 1.
+            low, high = self._consumer.get_watermark_offsets(tp, timeout=timeout.total_seconds())
+            tp.offset = high - 1
 
             assignment.append(tp)
 
@@ -238,6 +224,17 @@ class ConsumerConfig:
             }
             config["default.topic.config"] = default_topic_config
         elif self.start_at is ConsumerStartPosition.LATEST:
+            # FIXME: librdkafka has a bug in offset handling - it caches
+            # "OFFSET_END", and will repeatedly move to the end of the
+            # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
+            # it should get fixed in v1.5 of librdkafka.
+
+            librdkafka_version = confluent_kafka.libversion()[0]
+            if librdkafka_version < "1.5.0":
+                self.logger.warn(
+                    "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
+                    f"not receive data (your librdkafka version is {librdkafka_version}). See "
+                    "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
             default_topic_config = config.get("default.topic.config", {})
             default_topic_config = {
                 "auto.offset.reset": "LATEST",
