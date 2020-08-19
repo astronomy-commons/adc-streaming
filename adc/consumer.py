@@ -2,7 +2,7 @@ import dataclasses
 import enum
 import logging
 from datetime import timedelta
-from typing import Dict, Iterator, List, Optional, Set, Union
+from typing import Dict, Iterator, List, Optional, Set
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -44,25 +44,6 @@ class Consumer:
                 topic=topic,
                 partition=partition_id,
             )
-            # FIXME: This doesn't obey offsets stored in Kafka for existing groups.
-            if self.conf.start_at is ConsumerStartPosition.EARLIEST:
-                tp.offset = confluent_kafka.OFFSET_BEGINNING
-            elif self.conf.start_at is ConsumerStartPosition.LATEST:
-                # FIXME: librdkafka has a bug in offset handling - it caches
-                # "OFFSET_END", and will repeatedly move to the end of the
-                # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
-                # it should get fixed in v1.5 of librdkafka.
-
-                librdkafka_version = confluent_kafka.libversion()[0]
-                if librdkafka_version < "1.5.0":
-                    self.logger.warn(
-                        "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
-                        f"not receive data (your librdkafka version is {librdkafka_version}). See "
-                        "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
-                tp.offset = confluent_kafka.OFFSET_END
-            else:
-                tp.offset = self.conf.start_at
-
             assignment.append(tp)
 
         self.logger.debug("registering topic assignment")
@@ -186,7 +167,6 @@ class Consumer:
 class ConsumerStartPosition(enum.Enum):
     EARLIEST = 1
     LATEST = 2
-    PRODUCER = 3
 
     def __str__(self):
         return self.name.lower()
@@ -207,9 +187,8 @@ class ConsumerConfig:
     # was marked done with consumer.mark_done, regardless of this setting. This
     # is only used when the position in the stream is unknown.
     #
-    # This can either be a logical offset via a ConsumerStartPosition value, or
-    # it can be a specific offset as an integer.
-    start_at: Union[ConsumerStartPosition, int] = ConsumerStartPosition.EARLIEST
+    # This is specified as a logical offset via a ConsumerStartPosition value.
+    start_at: ConsumerStartPosition = ConsumerStartPosition.EARLIEST
 
     # Authentication package to pass in to read from Kafka.
     auth: Optional[SASLAuth] = None
@@ -238,6 +217,17 @@ class ConsumerConfig:
             }
             config["default.topic.config"] = default_topic_config
         elif self.start_at is ConsumerStartPosition.LATEST:
+            # FIXME: librdkafka has a bug in offset handling - it caches
+            # "OFFSET_END", and will repeatedly move to the end of the
+            # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
+            # it should get fixed in v1.5 of librdkafka.
+
+            librdkafka_version = confluent_kafka.libversion()[0]
+            if librdkafka_version < "1.5.0":
+                self.logger.warn(
+                    "In librdkafka before v1.5, LATEST offsets have buggy behavior; you may "
+                    f"not receive data (your librdkafka version is {librdkafka_version}). See "
+                    "https://github.com/confluentinc/confluent-kafka-dotnet/issues/1254.")
             default_topic_config = config.get("default.topic.config", {})
             default_topic_config = {
                 "auto.offset.reset": "LATEST",
