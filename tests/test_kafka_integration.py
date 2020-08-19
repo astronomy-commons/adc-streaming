@@ -85,32 +85,33 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"message 4")
 
-    def test_consume_from_specified_offset(self):
+    def test_consume_from_beginning(self):
         # Write a few messages.
-        topic = "test_consume_from_specified_offset"
-        simple_write_msgs(self.kafka, topic, [
+        topic = "test_consume_from_beginning"
+        batch = [
             "message 1",
             "message 2",
             "message 3",
             "message 4",
-        ])
+        ]
+        simple_write_msgs(self.kafka, topic, batch)
 
-        # Start a consumer from the third message (offset '2')
+        # Start a consumer from the beginning.
         consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
             broker_urls=[self.kafka.address],
             group_id="test_consumer",
             auth=self.kafka.auth,
-            start_at=2,
+            read_forever=False,
+            start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
         ))
         consumer.subscribe(topic)
         stream = consumer.stream()
+        msgs = [msg for msg in stream]
 
-        msg = next(stream)
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"message 3")
-        msg = next(stream)
-        self.assertEqual(msg.topic(), topic)
-        self.assertEqual(msg.value(), b"message 4")
+        self.assertEqual(len(batch), len(msgs))
+        for expected, actual in zip(batch, msgs):
+            self.assertEqual(actual.topic(), topic)
+            self.assertEqual(actual.value().decode(), expected)
 
     def test_consume_stored_offsets(self):
         # Write first batch of messages.

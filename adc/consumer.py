@@ -2,7 +2,7 @@ import dataclasses
 import enum
 import logging
 from datetime import timedelta
-from typing import Dict, Iterator, List, Optional, Set, Union
+from typing import Dict, Iterator, List, Optional, Set
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -187,9 +187,8 @@ class ConsumerConfig:
     # was marked done with consumer.mark_done, regardless of this setting. This
     # is only used when the position in the stream is unknown.
     #
-    # This can either be a logical offset via a ConsumerStartPosition value, or
-    # it can be a specific offset as an integer.
-    start_at: Union[ConsumerStartPosition, int] = ConsumerStartPosition.EARLIEST
+    # This is specified as a logical offset via a ConsumerStartPosition value.
+    start_at: ConsumerStartPosition = ConsumerStartPosition.EARLIEST
 
     # Authentication package to pass in to read from Kafka.
     auth: Optional[SASLAuth] = None
