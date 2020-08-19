@@ -44,11 +44,6 @@ class Consumer:
                 topic=topic,
                 partition=partition_id,
             )
-            # Get the current offsets stored in Kafka. The high offset
-            # is the offset of the last message + 1.
-            low, high = self._consumer.get_watermark_offsets(tp, timeout=timeout.total_seconds())
-            tp.offset = high - 1
-
             assignment.append(tp)
 
         self.logger.debug("registering topic assignment")
