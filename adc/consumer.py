@@ -167,7 +167,6 @@ class Consumer:
 class ConsumerStartPosition(enum.Enum):
     EARLIEST = 1
     LATEST = 2
-    PRODUCER = 3
 
     def __str__(self):
         return self.name.lower()
