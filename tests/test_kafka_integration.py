@@ -128,6 +128,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             broker_urls=[self.kafka.address],
             group_id="test_consumer_1",
             auth=self.kafka.auth,
+            read_forever=False,
             start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
         ))
         consumer_1.subscribe(topic)
@@ -138,7 +139,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(len(batch_1), len(msgs_1))
         for expected, actual in zip(batch_1, msgs_1):
             self.assertEqual(actual.topic(), topic)
-            self.assertEqual(actual.value(), expected)
+            self.assertEqual(actual.value().decode(), expected)
 
         # Write second batch of messages.
         batch_2 = [
@@ -156,13 +157,14 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(len(batch_2), len(msgs_1))
         for expected, actual in zip(batch_2, msgs_1):
             self.assertEqual(actual.topic(), topic)
-            self.assertEqual(actual.value(), expected)
+            self.assertEqual(actual.value().decode(), expected)
 
         # Start second consumer, also reading from earliest offset.
         consumer_2 = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
             broker_urls=[self.kafka.address],
             group_id="test_consumer_2",
             auth=self.kafka.auth,
+            read_forever=False,
             start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
         ))
         consumer_2.subscribe(topic)
@@ -173,7 +175,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(len(batch_1 + batch_2), len(msgs_2))
         for expected, actual in zip(batch_1 + batch_2, msgs_2):
             self.assertEqual(actual.topic(), topic)
-            self.assertEqual(actual.value(), expected)
+            self.assertEqual(actual.value().decode(), expected)
 
     def test_consume_not_forever(self):
         topic = "test_consume_not_forever"
