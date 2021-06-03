@@ -43,10 +43,13 @@ def raise_delivery_errors(kafka_error: confluent_kafka.KafkaError,
 class KafkaException(Exception):
     @classmethod
     def from_kafka_error(cls, error):
-        return cls(error.name(), error.str())
+        return cls(error)
 
-    def __init__(self, name, message):
-        self.name = name
-        self.message = message
-        msg = f"Error communicating with Kafka: code={name} {message}"
+    def __init__(self, error):
+        self.error = error
+        self.name = error.name()
+        self.reason = error.str()
+        self.retriable = error.retriable()
+        self.fatal = error.fatal()
+        msg = f"Error communicating with Kafka: code={self.name} {self.reason}"
         super(KafkaException, self).__init__(msg)
