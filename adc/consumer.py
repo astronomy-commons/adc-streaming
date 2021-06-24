@@ -199,16 +199,37 @@ class ConsumerConfig:
     # How often should we save our progress to Kafka?
     offset_commit_interval: timedelta = timedelta(seconds=5)
 
+    # Whether ncoming message CRCs should be checked to detect corruption in
+    # transit. Enabling this option has a small CPU use/throughput cost.
+    check_crcs: bool = False
+
+    # reconnect_backoff_time is the time that the backend should initially wait
+    # before attempting to reconnect to Kafka if its connection fails.
+    # Repeated failures will cause the wait time to be increased exponentially,
+    # with a random variation, until reconnect_max_time is reached.
+    reconnect_backoff_time: timedelta = timedelta(milliseconds=100)
+
+    # reconnect_max_time is the longest time that the backend should wait
+    # between attempts to reconnect to Kafka.
+    reconnect_max_time: timedelta = timedelta(seconds=10)
+
     def _to_confluent_kafka(self) -> Dict:
+        def as_ms(td: timedelta):
+            """Convert a timedelta object to a duration in milliseconds"""
+            return int(td.total_seconds() * 1000.0)
+
         config = {
             "bootstrap.servers": ",".join(self.broker_urls),
+            "check.crcs": self.check_crcs,
             "error_cb": self.error_callback,
             "group.id": self.group_id,
             "enable.auto.commit": True,
-            "auto.commit.interval.ms": int(self.offset_commit_interval.total_seconds() * 1000),
+            "auto.commit.interval.ms": as_ms(self.offset_commit_interval),
             "enable.auto.offset.store": False,
             "queued.min.messages": 1000,
             "enable.partition.eof": not self.read_forever,
+            "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
+            "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
         }
         if self.start_at is ConsumerStartPosition.EARLIEST:
             default_topic_config = config.get("default.topic.config", {})

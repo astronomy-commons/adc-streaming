@@ -73,12 +73,40 @@ class ProducerConfig:
 
     # produce_timeout sets the maximum amount of time that the backend can take
     # to send a message to Kafka. Use a value of 0 to never timeout.
-    produce_timeout = timedelta(seconds=10)
+    produce_timeout: timedelta = timedelta(seconds=10)
+
+    # produce_backoff_time sets the time the backend will wait before retrying
+    # to send a message to Kafka. May not be less than one millisecond.
+    produce_backoff_time: timedelta = timedelta(milliseconds=100)
+
+    # use_idempotence instructs the backend whether to ensure that messages are
+    # recorded by the broker exactly once and in the order of production.
+    use_idempotence: bool = False
+
+    # reconnect_backoff_time is the time that the backend should initially wait
+    # before attempting to reconnect to Kafka if its connection fails.
+    # Repeated failures will cause the wait time to be increased exponentially,
+    # with a random variation, until reconnect_max_time is reached.
+    reconnect_backoff_time: timedelta = timedelta(milliseconds=100)
+
+    # reconnect_max_time is the longest time that the backend should wait
+    # between attempts to reconnect to Kafka.
+    reconnect_max_time: timedelta = timedelta(seconds=10)
 
     def _to_confluent_kafka(self) -> Dict:
+        def as_ms(td: timedelta):
+            """Convert a timedelta object to a duration in milliseconds"""
+            return int(td.total_seconds() * 1000.0)
+
+        if self.produce_backoff_time < timedelta(milliseconds=1):
+            raise ValueError("produce_backoff_time may not be less than one millisecond")
         config = {
             "bootstrap.servers": ",".join(self.broker_urls),
-            "message.timeout.ms": self.produce_timeout.total_seconds() * 1000.0,
+            "enable.idempotence": self.use_idempotence,
+            "message.timeout.ms": as_ms(self.produce_timeout),
+            "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
+            "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
+            "retry.backoff.ms": as_ms(self.produce_backoff_time),
         }
         if self.error_callback is not None:
             config["error_cb"] = self.error_callback
