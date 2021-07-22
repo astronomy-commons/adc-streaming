@@ -66,7 +66,8 @@ class Consumer:
         continuously synchronize this information with Kafka so that the stream can be
         resumed from this point in the future.
         """
-        self._consumer.store_offsets(msg)
+        self._consumer.commit(msg, asynchronous=True)
+        self._consumer.poll(1e-3) # wait at most a millisecond
 
     def stream(self,
                autocommit: bool = True,
@@ -77,7 +78,7 @@ class Consumer:
         to which the client is subscribed.
 
         If autocommit is true, then messages are automatically marked as handled
-        when the next message is yielded. This removes the need to call
+        when they are yielded. This removes the need to call
         'mark_done' on each message. Callers using asynchronous message
         processing or with complex processing needs should disable this.
 
@@ -105,18 +106,16 @@ class Consumer:
                         batch_size: int = 100,
                         batch_timeout: timedelta = timedelta(seconds=1.0),
                         ) -> Iterator[confluent_kafka.Message]:
-        last_message: confluent_kafka.Message = None
         while True:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
             for m in messages:
                 err = m.error()
                 if err is None:
                     self.logger.debug(f"read message from partition {m.partition()}")
-                    yield m
                     # Automatically mark message as processed, if desired
-                    if autocommit and last_message is not None:
-                        self.mark_done(last_message)
-                        last_message = m
+                    if autocommit:
+                        self.mark_done(m)
+                    yield m
                 else:
                     raise(confluent_kafka.KafkaException(err))
 
@@ -136,18 +135,16 @@ class Consumer:
             self.logger.debug(f"tracking until eof for topic={tp.topic} partition={tp.partition}")
             active_partitions[tp.topic].add(tp.partition)
 
-        last_message: confluent_kafka.Message = None
         while len(active_partitions) > 0:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
             for m in messages:
                 err = m.error()
                 if err is None:
                     self.logger.debug(f"read message from partition {m.partition()}")
-                    yield m
                     # Automatically mark message as processed, if desired
-                    if autocommit and last_message is not None:
-                        self.mark_done(last_message)
-                        last_message = m
+                    if autocommit:
+                        self.mark_done(m)
+                    yield m
                 elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
                     self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
                     # Done with this partition, remove it
