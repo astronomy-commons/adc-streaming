@@ -23,14 +23,15 @@ class Producer:
         self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
 
     def write(self,
-              msg: Union[bytes, 'Serializable']) -> None:
+              msg: Union[bytes, 'Serializable'],
+              headers: Optional[Union[dict,list]] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         self.logger.debug("writing message to %s", self.conf.topic)
         if self.conf.delivery_callback is not None:
-            self._producer.produce(self.conf.topic, msg, on_delivery=self.conf.delivery_callback)
+            self._producer.produce(self.conf.topic, msg, headers=headers, on_delivery=self.conf.delivery_callback)
         else:
-            self._producer.produce(self.conf.topic, msg)
+            self._producer.produce(self.conf.topic, msg, headers=headers)
 
     def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
