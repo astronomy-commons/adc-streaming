@@ -24,7 +24,7 @@ class Producer:
 
     def write(self,
               msg: Union[bytes, 'Serializable'],
-              headers: Optional[Union[dict,list]]=None) -> None:
+              headers: Optional[Union[dict,list]] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         self.logger.debug("writing message to %s", self.conf.topic)
