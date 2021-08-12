@@ -67,7 +67,6 @@ class Consumer:
         resumed from this point in the future.
         """
         self._consumer.commit(msg, asynchronous=True)
-        self._consumer.poll(1e-3) # wait at most a millisecond
 
     def stream(self,
                autocommit: bool = True,
