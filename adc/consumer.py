@@ -60,13 +60,20 @@ class Consumer:
         self.logger.debug(f"cluster metadata: {cluster_meta.topics}")
         return cluster_meta.topics[topic]
 
-    def mark_done(self, msg: confluent_kafka.Message):
+    def mark_done(self, msg: confluent_kafka.Message, asynchronous: bool = True):
         """
         Mark a message as fully-processed. In the background, the client will
         continuously synchronize this information with Kafka so that the stream can be
         resumed from this point in the future.
+
+        If asynchronous is set to False, however, the information will be sent
+        to Kafka immediately. This option allows fine-grained reliablity, but
+        can seriously reduce throughput if used on every message.
         """
-        self._consumer.commit(msg, asynchronous=True)
+        if asynchronous:
+            self._consumer.store_offsets(msg)
+        else:
+            self._consumer.commit(msg, asynchronous=False)
 
     def stream(self,
                autocommit: bool = True,
@@ -107,16 +114,20 @@ class Consumer:
                         ) -> Iterator[confluent_kafka.Message]:
         while True:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
-            for m in messages:
-                err = m.error()
-                if err is None:
-                    self.logger.debug(f"read message from partition {m.partition()}")
-                    # Automatically mark message as processed, if desired
-                    if autocommit:
-                        self.mark_done(m)
-                    yield m
-                else:
-                    raise(confluent_kafka.KafkaException(err))
+            try:
+                for m in messages:
+                    err = m.error()
+                    if err is None:
+                        self.logger.debug(f"read message from partition {m.partition()}")
+                        # Automatically mark message as processed, if desired
+                        if autocommit:
+                            self.mark_done(m, asynchronous=True)
+                        yield m
+                    else:
+                        raise(confluent_kafka.KafkaException(err))
+            finally:
+                if autocommit:
+                    self._consumer.commit(asynchronous=True)
 
     def _stream_until_eof(self,
                           autocommit: bool = True,
@@ -136,24 +147,28 @@ class Consumer:
 
         while len(active_partitions) > 0:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
-            for m in messages:
-                err = m.error()
-                if err is None:
-                    self.logger.debug(f"read message from partition {m.partition()}")
-                    # Automatically mark message as processed, if desired
-                    if autocommit:
-                        self.mark_done(m)
-                    yield m
-                elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
-                    self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
-                    # Done with this partition, remove it
-                    partition_set = active_partitions[m.topic()]
-                    partition_set.remove(m.partition())
-                    if len(partition_set) == 0:
-                        # Done with all partitions for the topic, remove it
-                        del active_partitions[m.topic()]
-                else:
-                    raise(confluent_kafka.KafkaException(err))
+            try:
+                for m in messages:
+                    err = m.error()
+                    if err is None:
+                        self.logger.debug(f"read message from partition {m.partition()}")
+                        # Automatically mark message as processed, if desired
+                        if autocommit:
+                            self.mark_done(m, asynchronous=True)
+                        yield m
+                    elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
+                        self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
+                        # Done with this partition, remove it
+                        partition_set = active_partitions[m.topic()]
+                        partition_set.remove(m.partition())
+                        if len(partition_set) == 0:
+                            # Done with all partitions for the topic, remove it
+                            del active_partitions[m.topic()]
+                    else:
+                        raise(confluent_kafka.KafkaException(err))
+            finally:
+                if autocommit:
+                    self._consumer.commit(asynchronous=True)
 
     def close(self):
         """ Close the consumer, ending its subscriptions. """
