@@ -2,7 +2,7 @@ import dataclasses
 import enum
 import logging
 from datetime import timedelta
-from typing import Dict, Iterator, List, Optional, Set
+from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -22,29 +22,33 @@ class Consumer:
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
 
     def subscribe(self,
-                  topic: str,
+                  topics: Union[str, Iterable],
                   timeout: timedelta = timedelta(seconds=10)):
-        """Subscribes to a topic for consuming. This method doesn't use Kafka's
+        """Subscribes to topics for consuming. This method doesn't use Kafka's
         Consumer Groups; it assigns all partitions manually to this
         process.
 
-        The topic must already exist for the subscription to succeed.
+        The topics must already exist for the subscription to succeed.
         """
-        self.logger.debug(f"subscribing to topic {topic}")
-
-        try:
-            topic_meta = self.describe_topic(topic, timeout)
-        except KeyError:
-            raise ValueError(f"topic {topic} does not exist on the broker, so can't subscribe")
+        if isinstance(topics, str):
+            topics = [topics]
 
         assignment = []
-        for partition_id in topic_meta.partitions.keys():
-            self.logger.debug(f"adding subscription to topic partition={partition_id}")
-            tp = confluent_kafka.TopicPartition(
-                topic=topic,
-                partition=partition_id,
-            )
-            assignment.append(tp)
+        for topic in topics:
+            self.logger.debug(f"subscribing to topic {topic}")
+
+            try:
+                topic_meta = self.describe_topic(topic, timeout)
+            except KeyError:
+                raise ValueError(f"topic {topic} does not exist on the broker, so can't subscribe")
+
+            for partition_id in topic_meta.partitions.keys():
+                self.logger.debug(f"adding subscription to topic partition={partition_id}")
+                tp = confluent_kafka.TopicPartition(
+                    topic=topic,
+                    partition=partition_id,
+                )
+                assignment.append(tp)
 
         self.logger.debug("registering topic assignment")
         self._consumer.assign(assignment)
