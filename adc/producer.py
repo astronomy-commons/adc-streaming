@@ -24,12 +24,14 @@ class Producer:
 
     def write(self,
               msg: Union[bytes, 'Serializable'],
-              headers: Optional[Union[dict,list]] = None) -> None:
+              headers: Optional[Union[dict, list]] = None,
+              delivery_callback: Optional[DeliveryCallback] = log_delivery_errors) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         self.logger.debug("writing message to %s", self.conf.topic)
-        if self.conf.delivery_callback is not None:
-            self._producer.produce(self.conf.topic, msg, headers=headers, on_delivery=self.conf.delivery_callback)
+        if delivery_callback is not None:
+            self._producer.produce(self.conf.topic, msg, headers=headers,
+                                   on_delivery=delivery_callback)
         else:
             self._producer.produce(self.conf.topic, msg, headers=headers)
 
@@ -69,7 +71,6 @@ class ProducerConfig:
     broker_urls: List[str]
     topic: str
     auth: Optional[SASLAuth] = None
-    delivery_callback: Optional[DeliveryCallback] = log_delivery_errors
     error_callback: Optional[ErrorCallback] = log_client_errors
 
     # produce_timeout sets the maximum amount of time that the backend can take
