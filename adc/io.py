@@ -5,7 +5,7 @@ from typing import Iterable, List, Optional, Union
 
 import confluent_kafka  # type: ignore
 
-from adc import auth, consumer, errors, kafka, producer
+from adc import auth, consumer, kafka, producer
 
 logger = logging.getLogger("adc-streaming")
 
@@ -71,5 +71,4 @@ def _open_producer(
         broker_urls=broker_addresses,
         topic=topic,
         auth=auth,
-        delivery_callback=errors.raise_delivery_errors,
     ))

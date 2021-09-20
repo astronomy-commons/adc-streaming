@@ -24,13 +24,14 @@ class Producer:
 
     def write(self,
               msg: Union[bytes, 'Serializable'],
-              headers: Optional[Union[dict,list]] = None,
+              headers: Optional[Union[dict, list]] = None,
               delivery_callback: Optional[DeliveryCallback] = log_delivery_errors) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         self.logger.debug("writing message to %s", self.conf.topic)
         if delivery_callback is not None:
-            self._producer.produce(self.conf.topic, msg, headers=headers, on_delivery=delivery_callback)
+            self._producer.produce(self.conf.topic, msg, headers=headers,
+                                   on_delivery=delivery_callback)
         else:
             self._producer.produce(self.conf.topic, msg, headers=headers)
 
