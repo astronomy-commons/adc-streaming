@@ -154,6 +154,14 @@ class Consumer:
             try:
                 for m in messages:
                     err = m.error()
+                    # A new message may arrive from a previously removed topic/partition,
+                    # in which case it must be re-added
+                    if m.topic() not in active_partitions:
+                        active_partitions[m.topic()] = set()
+                    partition_set = active_partitions[m.topic()]
+                    if m.partition() not in partition_set:
+                        partition_set.add(m.partition())
+
                     if err is None:
                         self.logger.debug(f"read message from partition {m.partition()}")
                         # Automatically mark message as processed, if desired
@@ -163,7 +171,6 @@ class Consumer:
                     elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
                         self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
                         # Done with this partition, remove it
-                        partition_set = active_partitions[m.topic()]
                         partition_set.remove(m.partition())
                         if len(partition_set) == 0:
                             # Done with all partitions for the topic, remove it
