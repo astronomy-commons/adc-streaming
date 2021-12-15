@@ -19,7 +19,6 @@ def log_client_errors(kafka_error: confluent_kafka.KafkaError):
         logger.warn("client is currently disconnected from all brokers")
     else:
         logger.error(f"internal kafka error: {kafka_error}")
-        raise(KafkaException.from_kafka_error(kafka_error))
 
 
 DeliveryCallback = Callable[[confluent_kafka.KafkaError, confluent_kafka.Message], None]
