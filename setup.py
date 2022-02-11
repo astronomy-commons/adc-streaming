@@ -15,6 +15,7 @@ dev_requires = [
     "docker",
     "flake8",
     "isort",
+    "packaging",
     "pytest",
     "pytest-timeout",
     "pytest-integration",

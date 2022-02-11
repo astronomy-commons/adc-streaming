@@ -2,6 +2,7 @@ import dataclasses
 import enum
 import logging
 from datetime import timedelta
+from multiprocessing import context
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
 from collections import defaultdict
 
@@ -9,7 +10,7 @@ import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
 
 from .auth import SASLAuth
-from .errors import ErrorCallback, log_client_errors
+from .errors import ErrorCallback, log_client_errors, catch_kafka_version_support_errors
 
 
 class Consumer:
@@ -20,7 +21,8 @@ class Consumer:
     def __init__(self, conf: 'ConsumerConfig') -> None:
         self.logger = logging.getLogger("adc-streaming.consumer")
         self.conf = conf
-        self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
+        with catch_kafka_version_support_errors():
+            self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
 
     def subscribe(self,
                   topics: Union[str, Iterable],
