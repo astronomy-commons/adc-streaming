@@ -8,7 +8,7 @@ import confluent_kafka  # type: ignore
 
 from .auth import SASLAuth
 from .errors import (DeliveryCallback, ErrorCallback, log_client_errors,
-                     log_delivery_errors)
+                     log_delivery_errors, catch_kafka_version_support_errors)
 
 
 class Producer:
@@ -20,7 +20,8 @@ class Producer:
         self.logger = logging.getLogger("adc-streaming.producer")
         self.conf = conf
         self.logger.debug(f"connecting to producer with config {conf._to_confluent_kafka()}")
-        self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
+        with catch_kafka_version_support_errors():
+            self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
 
     def write(self,
               msg: Union[bytes, 'Serializable'],
