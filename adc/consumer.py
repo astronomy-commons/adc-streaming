@@ -3,6 +3,7 @@ import enum
 import logging
 from datetime import timedelta
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
+from collections import defaultdict
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -142,10 +143,8 @@ class Consumer:
 
         # Make a map of topic-name -> set of partition IDs we're assigned to.
         # When we hit a partition EOF, remove that partition from the map.
-        active_partitions: Dict[str, Set[int]] = {}
+        active_partitions: defaultdict[str, Set[int]] = defaultdict(set)
         for tp in assignment:
-            if tp.topic not in active_partitions:
-                active_partitions[tp.topic] = set()
             self.logger.debug(f"tracking until eof for topic={tp.topic} partition={tp.partition}")
             active_partitions[tp.topic].add(tp.partition)
 
@@ -154,6 +153,11 @@ class Consumer:
             try:
                 for m in messages:
                     err = m.error()
+                    # A new message may arrive from a previously removed topic/partition,
+                    # in which case it must be re-added
+                    partition_set = active_partitions[m.topic()]
+                    partition_set.add(m.partition())
+
                     if err is None:
                         self.logger.debug(f"read message from partition {m.partition()}")
                         # Automatically mark message as processed, if desired
@@ -163,7 +167,6 @@ class Consumer:
                     elif err.code() == confluent_kafka.KafkaError._PARTITION_EOF:
                         self.logger.debug(f"eof for topic={m.topic()} partition={m.partition()}")
                         # Done with this partition, remove it
-                        partition_set = active_partitions[m.topic()]
                         partition_set.remove(m.partition())
                         if len(partition_set) == 0:
                             # Done with all partitions for the topic, remove it
