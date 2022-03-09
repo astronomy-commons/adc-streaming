@@ -1,9 +1,7 @@
-from contextlib import contextmanager
 import logging
 from typing import Callable
 
 import confluent_kafka  # type: ignore
-from packaging.version import Version
 
 logger = logging.getLogger("adc-streaming")
 
@@ -54,23 +52,3 @@ class KafkaException(Exception):
         self.fatal = error.fatal()
         msg = f"Error communicating with Kafka: code={self.name} {self.reason}"
         super(KafkaException, self).__init__(msg)
-
-
-@contextmanager
-def catch_kafka_version_support_errors():
-    try:
-        yield
-    except confluent_kafka.KafkaException as e:
-        err, *_ = e.args
-        librdkafka_version, *_ = confluent_kafka.libversion()
-        if (
-            err.code() == confluent_kafka.KafkaError._INVALID_ARG
-            and any(err.str() == f'No such configuration property: "{key}"'
-                    for key in ['sasl.oauthbearer.client.id',
-                                'sasl.oauthbearer.client.secret',
-                                'sasl.oauthbearer.method',
-                                'sasl.oauthbearer.token.endpoint.url'])
-            and Version(librdkafka_version) < Version('1.9.0')
-        ):
-            raise RuntimeError(f'OpenID Connect support requires librdkafka >= 1.9.0, but you have {librdkafka_version}. Please install a newer version of confluent-kafka.') from e
-        raise
