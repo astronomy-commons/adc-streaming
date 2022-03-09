@@ -10,6 +10,7 @@ import confluent_kafka.admin  # type: ignore
 
 from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
+from .oidc import set_oauth_cb
 
 
 class Consumer:
@@ -276,4 +277,5 @@ class ConsumerConfig:
 
         if self.auth is not None:
             config.update(self.auth())
+        set_oauth_cb(config)
         return config

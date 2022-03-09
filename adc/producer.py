@@ -9,6 +9,7 @@ import confluent_kafka  # type: ignore
 from .auth import SASLAuth
 from .errors import (DeliveryCallback, ErrorCallback, log_client_errors,
                      log_delivery_errors)
+from .oidc import set_oauth_cb
 
 
 class Producer:
@@ -114,6 +115,7 @@ class ProducerConfig:
             config["error_cb"] = self.error_callback
         if self.auth is not None:
             config.update(self.auth())
+        set_oauth_cb(config)
         return config
 
 
