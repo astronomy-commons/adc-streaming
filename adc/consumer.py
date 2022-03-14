@@ -118,8 +118,9 @@ class Consumer:
                         batch_timeout: timedelta = timedelta(seconds=1.0),
                         ) -> Iterator[confluent_kafka.Message]:
         while True:
-            messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
             try:
+                messages = self._consumer.consume(batch_size,
+                                                  batch_timeout.total_seconds())
                 for m in messages:
                     err = m.error()
                     if err is None:
