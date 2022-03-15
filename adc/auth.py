@@ -12,6 +12,7 @@ class SASLMethod(Enum):
     PLAIN = 1
     SCRAM_SHA_256 = 2
     SCRAM_SHA_512 = 3
+    OAUTHBEARER = 4
 
     def __str__(self):
         return self.name.replace("_", "-")
@@ -31,15 +32,24 @@ class SASLAuth(object):
     ssl : `bool`, optional
         Whether to enable SSL (enabled by default).
     method : `SASLMethod`, optional
-        The SASL method to authenticate, default = SASLMethod.PLAIN.
+        The SASL method to authenticate. The default is SASLMethod.OAUTHBEARER
+        if token_endpoint is provided, or SASLMethod.PLAIN otherwise.
         See valid SASL methods in SASLMethod.
     ssl_ca_location : `str`, optional
         If using SSL via a self-signed cert, a path/location
         to the certificate.
+    token_endpoint : `str`, optional
+        The OpenID Connect token endpoint URL.
+        Required for OAUTHBEARER / OpenID Connect, otherwise ignored.
 
     """
 
-    def __init__(self, user, password, ssl=True, method=SASLMethod.PLAIN, **kwargs):
+    def __init__(self, user, password, ssl=True, method=None, token_endpoint=None, **kwargs):
+        if method is None:
+            if token_endpoint is None:
+                method = SASLMethod.PLAIN
+            else:
+                method = SASLMethod.OAUTHBEARER
         self._method = method
 
         # set up SSL options
@@ -58,8 +68,14 @@ class SASLAuth(object):
 
         # set up SASL options
         self._config["sasl.mechanism"] = str(self._method)
-        self._config["sasl.username"] = user
-        self._config["sasl.password"] = password
+        if token_endpoint:
+            self._config["sasl.oauthbearer.client.id"] = user
+            self._config["sasl.oauthbearer.client.secret"] = password
+            self._config["sasl.oauthbearer.method"] = "oidc"
+            self._config["sasl.oauthbearer.token.endpoint.url"] = token_endpoint
+        else:
+            self._config["sasl.username"] = user
+            self._config["sasl.password"] = password
 
     def __call__(self):
         return self._config
