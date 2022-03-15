@@ -6,7 +6,7 @@ def set_oauth_cb(config):
     (version 1.9.0). Meanwhile, this is a pure Python implementation of the
     refresh token callback.
     """
-    if config.pop('sasl.oauthbearer.method') != 'oidc':
+    if config.pop('sasl.oauthbearer.method', None) != 'oidc':
         return
 
     client_id = config.pop('sasl.oauthbearer.client.id')
