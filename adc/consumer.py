@@ -22,6 +22,9 @@ class Consumer:
         self.logger = logging.getLogger("adc-streaming.consumer")
         self.conf = conf
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
+        # Workaround for https://github.com/edenhill/librdkafka/issues/3263.
+        # Remove once confluent-kafka-python 1.9.0 has been released.
+        self._consumer.poll(0)
 
     def subscribe(self,
                   topics: Union[str, Iterable],

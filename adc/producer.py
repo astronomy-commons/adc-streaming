@@ -22,6 +22,9 @@ class Producer:
         self.conf = conf
         self.logger.debug(f"connecting to producer with config {conf._to_confluent_kafka()}")
         self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
+        # Workaround for https://github.com/edenhill/librdkafka/issues/3263.
+        # Remove once confluent-kafka-python 1.9.0 has been released.
+        self._producer.poll(0)
 
     def write(self,
               msg: Union[bytes, 'Serializable'],
