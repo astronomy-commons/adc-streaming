@@ -25,6 +25,7 @@ class Consumer:
         # Workaround for https://github.com/edenhill/librdkafka/issues/3263.
         # Remove once confluent-kafka-python 1.9.0 has been released.
         self._consumer.poll(0)
+        self.running = False
 
     def subscribe(self,
                   topics: Union[str, Iterable],
@@ -84,6 +85,12 @@ class Consumer:
         else:
             self._consumer.commit(msg, asynchronous=False)
 
+    def stop(self):
+        """Stops the runloop of the consumer. Useful when running the
+        consumer in a different thread.
+        """
+        self.running = False
+
     def stream(self,
                autocommit: bool = True,
                batch_size: int = 100,
@@ -121,11 +128,14 @@ class Consumer:
                         batch_size: int = 100,
                         batch_timeout: timedelta = timedelta(seconds=1.0),
                         ) -> Iterator[confluent_kafka.Message]:
-        while True:
+        self.running = True
+        while self.running is True:
             try:
                 messages = self._consumer.consume(batch_size,
                                                   batch_timeout.total_seconds())
                 for m in messages:
+                    if self.running is False:
+                        break
                     err = m.error()
                     if err is None:
                         self.logger.debug(f"read message from partition {m.partition()}")
@@ -153,10 +163,13 @@ class Consumer:
             self.logger.debug(f"tracking until eof for topic={tp.topic} partition={tp.partition}")
             active_partitions[tp.topic].add(tp.partition)
 
-        while len(active_partitions) > 0:
+        self.running = True
+        while len(active_partitions) > 0 and self.running is True:
             messages = self._consumer.consume(batch_size, batch_timeout.total_seconds())
             try:
                 for m in messages:
+                    if self.running is False:
+                        raise StopIteration
                     err = m.error()
                     # A new message may arrive from a previously removed topic/partition,
                     # in which case it must be re-added
@@ -181,6 +194,7 @@ class Consumer:
             finally:
                 if autocommit:
                     self._consumer.commit(asynchronous=True)
+        self.running = False
 
     def close(self):
         """ Close the consumer, ending its subscriptions. """
