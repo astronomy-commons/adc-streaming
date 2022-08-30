@@ -108,7 +108,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         stream = consumer.stream()
         msgs = [msg for msg in stream]
 
-        assert consumer.running is False
+        assert consumer._stop_event.is_set()
         self.assertEqual(len(batch), len(msgs))
         for expected, actual in zip(batch, msgs):
             self.assertEqual(actual.topic(), topic)
@@ -138,7 +138,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         msgs_1 = [msg for msg in stream_1]
 
         # Check that all messages from first batch are processed.
-        assert consumer_1.running is False
+        assert consumer_1._stop_event.is_set()
         self.assertEqual(len(batch_1), len(msgs_1))
         for expected, actual in zip(batch_1, msgs_1):
             self.assertEqual(actual.topic(), topic)
@@ -157,7 +157,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         # batch is processed.
         stream_1 = consumer_1.stream()
         msgs_1 = [msg for msg in stream_1]
-        assert consumer_1.running is False
+        assert consumer_1._stop_event.is_set()
         self.assertEqual(len(batch_2), len(msgs_1))
         for expected, actual in zip(batch_2, msgs_1):
             self.assertEqual(actual.topic(), topic)
@@ -176,7 +176,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         msgs_2 = [msg for msg in stream_2]
 
         # Now check that messages from both batches are processed.
-        assert consumer_2.running is False
+        assert consumer_2._stop_event.is_set()
         self.assertEqual(len(batch_1 + batch_2), len(msgs_2))
         for expected, actual in zip(batch_1 + batch_2, msgs_2):
             self.assertEqual(actual.topic(), topic)
@@ -200,10 +200,10 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             raise Exception(msg.error())
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"message 1")
-        assert consumer.running is True
+        assert not consumer._stop_event.is_set()
         with self.assertRaises(StopIteration):
             next(stream)
-        assert consumer.running is False
+        assert consumer._stop_event.is_set()
 
     def test_consumer_terminating_in_thread(self):
         topic = "test_consume_forever_in_thread"
