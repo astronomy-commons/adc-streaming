@@ -108,6 +108,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         stream = consumer.stream()
         msgs = [msg for msg in stream]
 
+        assert consumer._stop_event.is_set()
         self.assertEqual(len(batch), len(msgs))
         for expected, actual in zip(batch, msgs):
             self.assertEqual(actual.topic(), topic)
@@ -137,6 +138,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         msgs_1 = [msg for msg in stream_1]
 
         # Check that all messages from first batch are processed.
+        assert consumer_1._stop_event.is_set()
         self.assertEqual(len(batch_1), len(msgs_1))
         for expected, actual in zip(batch_1, msgs_1):
             self.assertEqual(actual.topic(), topic)
@@ -155,6 +157,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         # batch is processed.
         stream_1 = consumer_1.stream()
         msgs_1 = [msg for msg in stream_1]
+        assert consumer_1._stop_event.is_set()
         self.assertEqual(len(batch_2), len(msgs_1))
         for expected, actual in zip(batch_2, msgs_1):
             self.assertEqual(actual.topic(), topic)
@@ -173,6 +176,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         msgs_2 = [msg for msg in stream_2]
 
         # Now check that messages from both batches are processed.
+        assert consumer_2._stop_event.is_set()
         self.assertEqual(len(batch_1 + batch_2), len(msgs_2))
         for expected, actual in zip(batch_1 + batch_2, msgs_2):
             self.assertEqual(actual.topic(), topic)
@@ -196,8 +200,33 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             raise Exception(msg.error())
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"message 1")
+        assert not consumer._stop_event.is_set()
         with self.assertRaises(StopIteration):
             next(stream)
+        assert consumer._stop_event.is_set()
+
+    def test_consumer_terminating_in_thread(self):
+        topic = "test_consume_forever_in_thread"
+        simple_write_msgs(
+            self.kafka, topic, ["message 1", "message 2", "message 3"])
+
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            read_forever=True
+        ))
+        consumer.subscribe(topic)
+
+        import threading
+        t = threading.Thread(
+            target=lambda c: {_ for _ in c.stream()}, args=(consumer,),
+            name="ListenerThread")
+        t.start()
+        # stop listener
+        consumer.stop()
+        t.join()
+        assert t.is_alive() is False
 
     def test_contextmanager_support(self):
         topic = "test_contextmanager_support"
