@@ -17,6 +17,9 @@ def log_client_errors(kafka_error: confluent_kafka.KafkaError):
         # shutdown, too. See https://github.com/edenhill/librdkafka/issues/2543
         # for more background.
         logger.warn("client is currently disconnected from all brokers")
+    elif kafka_error.code() == confluent_kafka.KafkaError._TIMED_OUT:
+        # This error is not fatal, maybe caused due to a network issue
+        logger.warn("client connection timed out")
     else:
         logger.error(f"internal kafka error: {kafka_error}")
 
