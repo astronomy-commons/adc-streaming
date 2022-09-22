@@ -46,6 +46,4 @@ setup(name='adc-streaming',
       extras_require={
           "dev": dev_requires,
       },
-      setup_requires=['setuptools_scm'],
-      use_scm_version=True,
       zip_safe=False)
