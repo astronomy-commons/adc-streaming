@@ -1,8 +1,9 @@
 import abc
+from ast import comprehension
 import dataclasses
 import logging
 from datetime import timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import confluent_kafka  # type: ignore
 
@@ -99,6 +100,8 @@ class ProducerConfig:
     # between attempts to reconnect to Kafka.
     reconnect_max_time: timedelta = timedelta(seconds=10)
 
+    compression_type: Optional[Union[Literal['gzip'], Literal['snappy'], Literal['lz4'], Literal['zstd']]] = 'zstd'
+
     def _to_confluent_kafka(self) -> Dict:
         def as_ms(td: timedelta):
             """Convert a timedelta object to a duration in milliseconds"""
@@ -113,6 +116,7 @@ class ProducerConfig:
             "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
             "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
             "retry.backoff.ms": as_ms(self.produce_backoff_time),
+            "compression.type": self.compression_type or 'none',
         }
         if self.error_callback is not None:
             config["error_cb"] = self.error_callback
