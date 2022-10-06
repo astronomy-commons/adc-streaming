@@ -113,6 +113,7 @@ class ProducerConfig:
             "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
             "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
             "retry.backoff.ms": as_ms(self.produce_backoff_time),
+            "compression.type": "zstd",
         }
         if self.error_callback is not None:
             config["error_cb"] = self.error_callback
