@@ -102,6 +102,9 @@ class ProducerConfig:
 
     compression_type: Optional[Union[Literal['gzip'], Literal['snappy'], Literal['lz4'], Literal['zstd']]] = 'zstd'
 
+    # maximum message size, before compression
+    message_max_bytes: Optional[int] = None
+
     def _to_confluent_kafka(self) -> Dict:
         def as_ms(td: timedelta):
             """Convert a timedelta object to a duration in milliseconds"""
@@ -118,6 +121,8 @@ class ProducerConfig:
             "retry.backoff.ms": as_ms(self.produce_backoff_time),
             "compression.type": self.compression_type or 'none',
         }
+        if self.message_max_bytes is not None:
+            config['message.max.bytes'] = self.message_max_bytes
         if self.error_callback is not None:
             config["error_cb"] = self.error_callback
         if self.auth is not None:
