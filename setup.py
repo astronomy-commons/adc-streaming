@@ -9,7 +9,8 @@ install_requires = [
     "importlib-metadata ; python_version < '3.8'",
     "requests",  # FIXME: drop after next release of confluent-kafka with OIDC support
     "tqdm",
-    "certifi>=2020.04.05.1"
+    "certifi>=2020.04.05.1",
+    "typing-extensions ; python_version < '3.8'",
 ]
 
 dev_requires = [

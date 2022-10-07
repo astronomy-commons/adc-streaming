@@ -3,7 +3,11 @@ from ast import comprehension
 import dataclasses
 import logging
 from datetime import timedelta
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Optional, Union
+try:  # this will work only in python >= 3.8
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 import confluent_kafka  # type: ignore
 
