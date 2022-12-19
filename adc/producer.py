@@ -104,7 +104,7 @@ class ProducerConfig:
     # between attempts to reconnect to Kafka.
     reconnect_max_time: timedelta = timedelta(seconds=10)
 
-    compression_type: Optional[Union[Literal['gzip'], Literal['snappy'], Literal['lz4'], Literal['zstd']]] = 'zstd'
+    compression_type: Optional[Union[Literal['gzip'], Literal['snappy'], Literal['lz4'], Literal['zstd']]] = None
 
     # maximum message size, before compression
     message_max_bytes: Optional[int] = None
