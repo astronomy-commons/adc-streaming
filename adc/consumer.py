@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import threading
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
 from collections import defaultdict
+from collections.abc import Collection
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -12,7 +13,6 @@ import confluent_kafka.admin  # type: ignore
 from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
 from .oidc import set_oauth_cb
-
 
 class LogicalOffset(enum.IntEnum):
     BEGINNING = confluent_kafka.OFFSET_BEGINNING
@@ -41,8 +41,7 @@ class Consumer:
 
     def subscribe(self,
                   topics: Union[str, Iterable],
-                  timeout: timedelta = timedelta(seconds=10),
-                  start_at: Union[datetime, LogicalOffset] = LogicalOffset.INVALID):
+                  timeout: timedelta = timedelta(seconds=10)):
         """Subscribes to topics for consuming. This method doesn't use Kafka's
         Consumer Groups; it assigns all partitions manually to this
         process.
@@ -51,11 +50,6 @@ class Consumer:
         """
         if isinstance(topics, str):
             topics = [topics]
-
-        if isinstance(start_at, datetime):
-            offset = int(start_at.timestamp() * 1000) # offsets_for_times takes milliseconds
-        else:
-            offset = start_at
 
         assignment = []
         for topic in topics:
@@ -71,13 +65,8 @@ class Consumer:
                 tp = confluent_kafka.TopicPartition(
                     topic=topic,
                     partition=partition_id,
-                    offset=offset
                 )
                 assignment.append(tp)
-
-        if isinstance(start_at, datetime):
-            self.logger.debug(f"calculating offsets for given time")
-            assignment = self._consumer.offsets_for_times(assignment)
 
         self.logger.debug("registering topic assignment")
         self._consumer.assign(assignment)
@@ -108,6 +97,26 @@ class Consumer:
         else:
             self._consumer.commit(msg, asynchronous=False)
 
+    def _offsets_for_position(self, partitions: Collection[confluent_kafka.TopicPartition],
+                              position: Union[datetime, LogicalOffset]) -> List[confluent_kafka.TopicPartition]:
+        if isinstance(position, datetime):
+            offset = int(position.timestamp() * 1000)
+        elif isinstance(position, LogicalOffset):
+            offset = position
+        else:
+            raise TypeError("Only datetime objects and logical offsets supported")
+        
+        _partitions = [
+            confluent_kafka.TopicPartition(topic=tp.topic, partition=tp.partition, offset=offset)
+            for tp in partitions
+        ]
+
+        if isinstance(position, datetime):
+            self.logger.debug("looking up offsets for time")
+            return self._consumer.offsets_for_times(_partitions)
+        else:
+            return _partitions
+
     def stop(self):
         """Stops the runloop of the consumer. Useful when running the
         consumer in a different thread.
@@ -117,7 +126,8 @@ class Consumer:
     def stream(self,
                autocommit: bool = True,
                batch_size: int = 100,
-               batch_timeout: timedelta = timedelta(seconds=1.0)
+               batch_timeout: timedelta = timedelta(seconds=1.0),
+               start_at: Union[datetime, LogicalOffset] = LogicalOffset.INVALID
                ) -> Iterator[confluent_kafka.Message]:
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
@@ -141,6 +151,10 @@ class Consumer:
         behavior in this case.
 
         """
+
+        assignment = self._consumer.assignment()
+        self._consumer.assign(self._offsets_for_position(assignment, start_at))
+
         if self.conf.read_forever:
             return self._stream_forever(autocommit, batch_size, batch_timeout)
         else:
