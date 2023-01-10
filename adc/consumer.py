@@ -3,9 +3,10 @@ import enum
 import logging
 from datetime import datetime, timedelta
 import threading
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
+# Imports from typing are deprecated as of Python 3.9 but required for
+# compatibility with earlier versions
+from typing import Dict, Iterable, Iterator, List, Optional, Set, Union, Collection
 from collections import defaultdict
-from collections.abc import Collection
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -144,6 +145,15 @@ class Consumer:
         provide a full batch of batch_size messages. Higher values may be more
         efficient, but may add latency.
 
+        start_at controls the location in every partition the client reads
+        from, overriding the configured default position or the stored offsets.
+        Either a special logical offset value (END, BEGINNING, STORE, INVALID)
+        or a datetime. Using a datetime will cause reading to start from the
+        first message *after* the specified datetime (or END if none exists).
+        
+        (LogicalOffset.INVALID was the previous behavior, which is currently
+        treated the same as STORED by libdkafka).
+
         If the consumer's configuration has read_forever set to False, then the
         stream stops when the client has hit the last message in all partitions.
         This set of partitions is calculated just once when iterate() is first
@@ -240,7 +250,7 @@ class Consumer:
 # Used to be called ConsumerStartPosition, though this was confusing because
 # it only affects "auto.offset.reset" not the start position for a call to
 # consume.
-class ConsumerResetPosition(enum.Enum):
+class ConsumerDefaultPosition(enum.Enum):
     EARLIEST = 1
     LATEST = 2
 
@@ -249,7 +259,7 @@ class ConsumerResetPosition(enum.Enum):
 
 # Alias to the old name
 # TODO: Remove alias on the next breaking release
-ConsumerStartPosition = ConsumerResetPosition
+ConsumerStartPosition = ConsumerDefaultPosition
 
 @dataclasses.dataclass
 class ConsumerConfig:
@@ -267,12 +277,12 @@ class ConsumerConfig:
     # is only used when the position in the stream is unknown.
     #
     # You can force reading at a logical offset or datetime with the "start_at"
-    # argument to Consumer.subscribe().
+    # argument to Consumer.stream().
     #
-    # This is specified via a ConsumerResetPosition value.
+    # This is specified via a ConsumerDefaultPosition value.
     #
     # TODO: rename on next breaking release
-    start_at: ConsumerResetPosition = ConsumerResetPosition.EARLIEST
+    start_at: ConsumerDefaultPosition = ConsumerDefaultPosition.EARLIEST
 
     # Authentication package to pass in to read from Kafka.
     auth: Optional[SASLAuth] = None
@@ -315,13 +325,13 @@ class ConsumerConfig:
             "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
             "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
         }
-        if self.start_at is ConsumerResetPosition.EARLIEST:
+        if self.start_at is ConsumerDefaultPosition.EARLIEST:
             default_topic_config = config.get("default.topic.config", {})
             default_topic_config = {
                 "auto.offset.reset": "EARLIEST",
             }
             config["default.topic.config"] = default_topic_config
-        elif self.start_at is ConsumerResetPosition.LATEST:
+        elif self.start_at is ConsumerDefaultPosition.LATEST:
             # FIXME: librdkafka has a bug in offset handling - it caches
             # "OFFSET_END", and will repeatedly move to the end of the
             # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
