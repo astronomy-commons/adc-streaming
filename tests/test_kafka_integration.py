@@ -2,7 +2,7 @@ import logging
 import tempfile
 import time
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 import docker
@@ -59,10 +59,9 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"can you hear me?")
 
-    @unittest.skip("skipping due to bug in librdkafka")
-    def test_consume_from_end(self):
+    def test_reset_to_end(self):
         # Write a few messages.
-        topic = "test_consume_from_end"
+        topic = "test_reset_to_end"
         simple_write_msgs(self.kafka, topic, [
             "message 1",
             "message 2",
@@ -79,15 +78,16 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         stream = consumer.stream()
 
         # Now add messages after the "end"
+        time.sleep(0.5)
         simple_write_msg(self.kafka, topic, "message 4")
-
+        time.sleep(0.5)
         msg = next(stream)
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"message 4")
 
-    def test_consume_from_beginning(self):
+    def test_reset_to_beginning(self):
         # Write a few messages.
-        topic = "test_consume_from_beginning"
+        topic = "test_reset_to_beginning"
         batch = [
             "message 1",
             "message 2",
@@ -164,23 +164,152 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             self.assertEqual(actual.value().decode(), expected)
 
         # Start second consumer, also reading from earliest offset.
-        consumer_2 = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+        consumer_2a = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
             broker_urls=[self.kafka.address],
             group_id="test_consumer_2",
             auth=self.kafka.auth,
             read_forever=False,
             start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
         ))
-        consumer_2.subscribe(topic)
-        stream_2 = consumer_2.stream()
-        msgs_2 = [msg for msg in stream_2]
+        consumer_2a.subscribe(topic)
 
-        # Now check that messages from both batches are processed.
-        assert consumer_2._stop_event.is_set()
-        self.assertEqual(len(batch_1 + batch_2), len(msgs_2))
-        for expected, actual in zip(batch_1 + batch_2, msgs_2):
+        # read the topic using consumer_2a
+        stream_2a = consumer_2a.stream()
+        msgs_2a = [pair for pair in zip(batch_1, stream_2a)]
+        # end iteration early after batch 1
+        stream_2a.close()
+
+        # check that messages from only batch 1 were consumed
+        self.assertEqual(len(batch_1), len(msgs_2a))
+        for expected, actual in msgs_2a:
             self.assertEqual(actual.topic(), topic)
             self.assertEqual(actual.value().decode(), expected)
+
+        # commit autocommited indices
+        consumer_2a.close()
+
+        # Start another consumer with the same groupid
+        consumer_2b = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer_2",
+            auth=self.kafka.auth,
+            read_forever=False,
+            start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
+        ))
+        consumer_2b.subscribe(topic)
+        stream_2b = consumer_2b.stream(autocommit=False, start_at=adc.consumer.LogicalOffset.STORED)
+
+        # read the rest using consumer_2b
+        msgs_2b = [msg for msg in stream_2b]
+
+        # Now check that messages from only batch_2 were read.
+        assert consumer_2b._stop_event.is_set()
+        self.assertEqual(len(batch_2), len(msgs_2b))
+        for expected, actual in zip(batch_2, msgs_2b):
+            self.assertEqual(actual.topic(), topic)
+            self.assertEqual(actual.value().decode(), expected)
+
+    def test_consume_from_beginning(self):
+        # Write a few messages.
+        topic = "test_consume_from_beginning"
+        batch = [
+            "message 1",
+            "message 2",
+            "message 3",
+            "message 4",
+        ]
+        simple_write_msgs(self.kafka, topic, batch)
+
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            read_forever=False,
+            # Make reading start at the end by default
+            start_at=adc.consumer.ConsumerStartPosition.LATEST,
+        ))
+        consumer.subscribe(topic)
+        # Request reading from the beginning
+        stream = consumer.stream(start_at=adc.consumer.LogicalOffset.BEGINNING)
+        msgs = [msg for msg in stream]
+
+        assert consumer._stop_event.is_set()
+        self.assertEqual(len(batch), len(msgs))
+        for expected, actual in zip(batch, msgs):
+            self.assertEqual(actual.topic(), topic)
+            self.assertEqual(actual.value().decode(), expected)
+
+        # Read again from the beginning
+        stream = consumer.stream(start_at=adc.consumer.LogicalOffset.BEGINNING)
+        msgs = [msg for msg in stream]
+
+        assert consumer._stop_event.is_set()
+        self.assertEqual(len(batch), len(msgs))
+        for expected, actual in zip(batch, msgs):
+            self.assertEqual(actual.topic(), topic)
+            self.assertEqual(actual.value().decode(), expected)
+
+    def test_consume_from_end(self):
+        # Write a few messages.
+        topic = "test_consume_from_end"
+        simple_write_msgs(self.kafka, topic, [
+            "message 1",
+            "message 2",
+            "message 3",
+        ])
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            # Make reading start at the beginning by default
+            start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
+        ))
+        consumer.subscribe(topic)
+        # Request reading from the end
+        stream = consumer.stream(start_at=adc.consumer.LogicalOffset.END)
+
+        # Now add messages after the "end"
+        time.sleep(0.5)
+        simple_write_msg(self.kafka, topic, "message 4")
+        time.sleep(0.5)
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")
+
+    def test_consume_from_datetime(self):
+        # Write a few messages.
+        topic = "test_consume_from_datetime"
+        simple_write_msgs(self.kafka, topic, [
+            "message 1",
+            "message 2",
+            "message 3",
+        ])        
+        # Wait a while, write, and wait some more
+        time.sleep(2)
+        client_middle_time = datetime.now()
+        time.sleep(2)
+        simple_write_msg(self.kafka, topic, "message 4")
+        time.sleep(1)
+
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+            read_forever=False,
+            start_at=adc.consumer.ConsumerStartPosition.EARLIEST,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.stream()
+        timestamps = [datetime.fromtimestamp(msg.timestamp()[1] / 1000.0) for msg in stream]
+
+        middle_time = timestamps[2] + (timestamps[3] - timestamps[2]) / 2
+        diff = middle_time - client_middle_time
+        logger.info(f"Difference between client and received timestamps: {diff!s}")
+
+        stream = consumer.stream(start_at=middle_time)
+        msg = next(stream)
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message 4")
 
     def test_consume_not_forever(self):
         topic = "test_consume_not_forever"
