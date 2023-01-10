@@ -128,7 +128,7 @@ class Consumer:
                autocommit: bool = True,
                batch_size: int = 100,
                batch_timeout: timedelta = timedelta(seconds=1.0),
-               start_at: Union[datetime, LogicalOffset] = LogicalOffset.INVALID
+               start_at: Union[datetime, LogicalOffset, None] = None
                ) -> Iterator[confluent_kafka.Message]:
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
@@ -150,9 +150,9 @@ class Consumer:
         Either a special logical offset value (END, BEGINNING, STORE, INVALID)
         or a datetime. Using a datetime will cause reading to start from the
         first message *after* the specified datetime (or END if none exists).
-        
-        (LogicalOffset.INVALID was the previous behavior, which is currently
-        treated the same as STORED by libdkafka).
+        Using this parameter will override any previously assigned but not
+        committed offsets if they are managed from outside adc. Passing None
+        (or leaving it unspecified) avoids reassignment.
 
         If the consumer's configuration has read_forever set to False, then the
         stream stops when the client has hit the last message in all partitions.
@@ -162,8 +162,9 @@ class Consumer:
 
         """
 
-        assignment = self._consumer.assignment()
-        self._consumer.assign(self._offsets_for_position(assignment, start_at))
+        if start_at is not None:
+            assignment = self._consumer.assignment()
+            self._consumer.assign(self._offsets_for_position(assignment, start_at))
 
         if self.conf.read_forever:
             return self._stream_forever(autocommit, batch_size, batch_timeout)
