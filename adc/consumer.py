@@ -23,7 +23,7 @@ class Consumer:
         self.logger = logging.getLogger("adc-streaming.consumer")
         self.conf = conf
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
-        # Workaround for https://github.com/edenhill/librdkafka/issues/3871.
+        # Workaround for https://github.com/confluentinc/librdkafka/issues/3753#issuecomment-1058272987.
         # FIXME: Remove once fixed upstream, or on removal of oauth_cb.
         self._consumer.poll(0)
         self._stop_event = threading.Event()
