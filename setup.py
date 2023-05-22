@@ -4,7 +4,7 @@ from setuptools import setup
 # requirements
 install_requires = [
     "authlib",  # FIXME: drop after next release of confluent-kafka with OIDC support
-    "confluent-kafka",
+    "confluent-kafka >= 1.6.1, != 2.1.0, != 2.1.1",
     "dataclasses ; python_version < '3.7'",
     "importlib-metadata ; python_version < '3.8'",
     "requests",  # FIXME: drop after next release of confluent-kafka with OIDC support
