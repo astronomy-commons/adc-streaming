@@ -1,9 +1,11 @@
 import dataclasses
 import enum
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 import threading
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
+# Imports from typing are deprecated as of Python 3.9 but required for
+# compatibility with earlier versions
+from typing import Dict, Iterable, Iterator, List, Optional, Set, Union, Collection
 from collections import defaultdict
 
 import confluent_kafka  # type: ignore
@@ -13,6 +15,16 @@ from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
 from .oidc import set_oauth_cb
 
+class LogicalOffset(enum.IntEnum):
+    BEGINNING = confluent_kafka.OFFSET_BEGINNING
+    EARLIEST = confluent_kafka.OFFSET_BEGINNING
+
+    END = confluent_kafka.OFFSET_END
+    LATEST = confluent_kafka.OFFSET_END
+
+    STORED = confluent_kafka.OFFSET_STORED
+
+    INVALID = confluent_kafka.OFFSET_INVALID
 
 class Consumer:
     conf: 'ConsumerConfig'
@@ -86,6 +98,26 @@ class Consumer:
         else:
             self._consumer.commit(msg, asynchronous=False)
 
+    def _offsets_for_position(self, partitions: Collection[confluent_kafka.TopicPartition],
+                              position: Union[datetime, LogicalOffset]) -> List[confluent_kafka.TopicPartition]:
+        if isinstance(position, datetime):
+            offset = int(position.timestamp() * 1000)
+        elif isinstance(position, LogicalOffset):
+            offset = position
+        else:
+            raise TypeError("Only datetime objects and logical offsets supported")
+        
+        _partitions = [
+            confluent_kafka.TopicPartition(topic=tp.topic, partition=tp.partition, offset=offset)
+            for tp in partitions
+        ]
+
+        if isinstance(position, datetime):
+            self.logger.debug("looking up offsets for time")
+            return self._consumer.offsets_for_times(_partitions)
+        else:
+            return _partitions
+
     def stop(self):
         """Stops the runloop of the consumer. Useful when running the
         consumer in a different thread.
@@ -95,7 +127,8 @@ class Consumer:
     def stream(self,
                autocommit: bool = True,
                batch_size: int = 100,
-               batch_timeout: timedelta = timedelta(seconds=1.0)
+               batch_timeout: timedelta = timedelta(seconds=1.0),
+               start_at: Union[datetime, LogicalOffset, None] = None
                ) -> Iterator[confluent_kafka.Message]:
         """Returns a stream which iterates over the messages in the topics
         to which the client is subscribed.
@@ -112,6 +145,15 @@ class Consumer:
         provide a full batch of batch_size messages. Higher values may be more
         efficient, but may add latency.
 
+        start_at controls the location in every partition the client reads
+        from, overriding the configured default position or the stored offsets.
+        Either a special logical offset value (END, BEGINNING, STORE, INVALID)
+        or a datetime. Using a datetime will cause reading to start from the
+        first message *after* the specified datetime (or END if none exists).
+        Using this parameter will override any previously assigned but not
+        committed offsets if they are managed from outside adc. Passing None
+        (or leaving it unspecified) avoids reassignment.
+
         If the consumer's configuration has read_forever set to False, then the
         stream stops when the client has hit the last message in all partitions.
         This set of partitions is calculated just once when iterate() is first
@@ -119,6 +161,11 @@ class Consumer:
         behavior in this case.
 
         """
+
+        if start_at is not None:
+            assignment = self._consumer.assignment()
+            self._consumer.assign(self._offsets_for_position(assignment, start_at))
+
         if self.conf.read_forever:
             return self._stream_forever(autocommit, batch_size, batch_timeout)
         else:
@@ -201,14 +248,19 @@ class Consumer:
         """ Close the consumer, ending its subscriptions. """
         self._consumer.close()
 
-
-class ConsumerStartPosition(enum.Enum):
+# Used to be called ConsumerStartPosition, though this was confusing because
+# it only affects "auto.offset.reset" not the start position for a call to
+# consume.
+class ConsumerDefaultPosition(enum.Enum):
     EARLIEST = 1
     LATEST = 2
 
     def __str__(self):
         return self.name.lower()
 
+# Alias to the old name
+# TODO: Remove alias on the next breaking release
+ConsumerStartPosition = ConsumerDefaultPosition
 
 @dataclasses.dataclass
 class ConsumerConfig:
@@ -225,8 +277,13 @@ class ConsumerConfig:
     # was marked done with consumer.mark_done, regardless of this setting. This
     # is only used when the position in the stream is unknown.
     #
-    # This is specified as a logical offset via a ConsumerStartPosition value.
-    start_at: ConsumerStartPosition = ConsumerStartPosition.EARLIEST
+    # You can force reading at a logical offset or datetime with the "start_at"
+    # argument to Consumer.stream().
+    #
+    # This is specified via a ConsumerDefaultPosition value.
+    #
+    # TODO: rename on next breaking release
+    start_at: ConsumerDefaultPosition = ConsumerDefaultPosition.EARLIEST
 
     # Authentication package to pass in to read from Kafka.
     auth: Optional[SASLAuth] = None
@@ -269,13 +326,13 @@ class ConsumerConfig:
             "reconnect.backoff.max.ms": as_ms(self.reconnect_max_time),
             "reconnect.backoff.ms": as_ms(self.reconnect_backoff_time),
         }
-        if self.start_at is ConsumerStartPosition.EARLIEST:
+        if self.start_at is ConsumerDefaultPosition.EARLIEST:
             default_topic_config = config.get("default.topic.config", {})
             default_topic_config = {
                 "auto.offset.reset": "EARLIEST",
             }
             config["default.topic.config"] = default_topic_config
-        elif self.start_at is ConsumerStartPosition.LATEST:
+        elif self.start_at is ConsumerDefaultPosition.LATEST:
             # FIXME: librdkafka has a bug in offset handling - it caches
             # "OFFSET_END", and will repeatedly move to the end of the
             # topic. See https://github.com/edenhill/librdkafka/pull/2876 -
