@@ -18,7 +18,7 @@ def set_oauth_cb(config):
 
     from authlib.integrations.requests_client import OAuth2Session
     session = OAuth2Session(client_id, client_secret, scope=scope)
-    
+
     def oauth_cb(*_, **__):
         token = session.fetch_token(
             token_endpoint, grant_type='client_credentials')
