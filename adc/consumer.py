@@ -1,12 +1,13 @@
 import dataclasses
 import enum
 import logging
-from datetime import datetime, timedelta
 import threading
+from collections import defaultdict
+from datetime import datetime, timedelta
 # Imports from typing are deprecated as of Python 3.9 but required for
 # compatibility with earlier versions
-from typing import Dict, Iterable, Iterator, List, Optional, Set, Union, Collection
-from collections import defaultdict
+from typing import (Collection, Dict, Iterable, Iterator, List, Optional, Set,
+                    Union)
 
 import confluent_kafka  # type: ignore
 import confluent_kafka.admin  # type: ignore
@@ -14,6 +15,7 @@ import confluent_kafka.admin  # type: ignore
 from .auth import SASLAuth
 from .errors import ErrorCallback, log_client_errors
 from .oidc import set_oauth_cb
+
 
 class LogicalOffset(enum.IntEnum):
     BEGINNING = confluent_kafka.OFFSET_BEGINNING
@@ -25,6 +27,7 @@ class LogicalOffset(enum.IntEnum):
     STORED = confluent_kafka.OFFSET_STORED
 
     INVALID = confluent_kafka.OFFSET_INVALID
+
 
 class Consumer:
     conf: 'ConsumerConfig'
@@ -99,14 +102,15 @@ class Consumer:
             self._consumer.commit(msg, asynchronous=False)
 
     def _offsets_for_position(self, partitions: Collection[confluent_kafka.TopicPartition],
-                              position: Union[datetime, LogicalOffset]) -> List[confluent_kafka.TopicPartition]:
+                              position: Union[datetime, LogicalOffset]) \
+            -> List[confluent_kafka.TopicPartition]:
         if isinstance(position, datetime):
             offset = int(position.timestamp() * 1000)
         elif isinstance(position, LogicalOffset):
             offset = position
         else:
             raise TypeError("Only datetime objects and logical offsets supported")
-        
+
         _partitions = [
             confluent_kafka.TopicPartition(topic=tp.topic, partition=tp.partition, offset=offset)
             for tp in partitions
@@ -248,6 +252,7 @@ class Consumer:
         """ Close the consumer, ending its subscriptions. """
         self._consumer.close()
 
+
 # Used to be called ConsumerStartPosition, though this was confusing because
 # it only affects "auto.offset.reset" not the start position for a call to
 # consume.
@@ -258,9 +263,11 @@ class ConsumerDefaultPosition(enum.Enum):
     def __str__(self):
         return self.name.lower()
 
+
 # Alias to the old name
 # TODO: Remove alias on the next breaking release
 ConsumerStartPosition = ConsumerDefaultPosition
+
 
 @dataclasses.dataclass
 class ConsumerConfig:
