@@ -377,6 +377,43 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(messages[1].value(), b"message 2")
         self.assertEqual(messages[2].value(), b"message 3")
 
+    def test_multi_topic_handling(self):
+        """Use a single producer object to write messages to multiple topics,
+        and check that a consumer can receive them all.
+
+        """
+        topics = ["test_multi_1", "test_multi_2"]
+
+        # Push some messages in
+        producer = adc.producer.Producer(adc.producer.ProducerConfig(
+            broker_urls=[self.kafka.address],
+            topic=None,
+            auth=self.kafka.auth,
+        ))
+        for i in range(0,8):
+            producer.write(str(i), topic=topics[i%2])
+        producer.flush()
+        logger.info("messages sent")
+
+        # check that we receive the messages from the right topics
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+        ))
+        consumer.subscribe(topics)
+        stream = consumer.stream()
+        total_messages = 0;
+        for msg in stream:
+            if msg.error() is not None:
+                raise Exception(msg.error())
+            idx = int(msg.value())
+            self.assertEqual(msg.topic(), topics[idx%2])
+            total_messages += 1
+            if total_messages == 8:
+                break
+        self.assertEqual(total_messages, 8)
+
 
 class KafkaDockerConnection:
     """Holds connection information for communicating with a Kafka broker running
@@ -437,6 +474,8 @@ class KafkaDockerConnection:
         if not addrs:
             return None
         ip = addrs[0]['HostIp']
+        if len(ip) == 0:
+            ip = "localhost"
         port = addrs[0]['HostPort']
         return f"{ip}:{port}"
 
@@ -502,8 +541,16 @@ class KafkaDockerConnection:
             detach=True,
             auto_remove=True,
             network=self.net.name,
-            # Setting None below the OS pick an ephemeral port.
-            ports={"9092/tcp": None},
+            # Kafka insists on redirecting consumers to one of its advertised listeners,
+            # which it will get wrong if it is running in a private container network.
+            # To fix this, we need to tell it what to advertise, which means we must
+            # know what port will be visible from the host system, and we cannot use an
+            # ephemeral port, which would be known to us only after the container is
+            # started. Since we have to pick something, pick 9092, which means that
+            # these tests cannot run if there is already an instance of Kafka running on
+            # the same host.
+            ports={"9092/tcp": 9092},
+            command=["/root/runServer","--advertisedListener","SASL_SSL://localhost:9092"],
         )
 
     def get_or_create_docker_network(self):

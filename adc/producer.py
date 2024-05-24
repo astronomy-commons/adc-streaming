@@ -34,15 +34,23 @@ class Producer:
     def write(self,
               msg: Union[bytes, 'Serializable'],
               headers: Optional[Union[dict, list]] = None,
-              delivery_callback: Optional[DeliveryCallback] = log_delivery_errors) -> None:
+              delivery_callback: Optional[DeliveryCallback] = log_delivery_errors,
+              topic: Optional[str] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
-        self.logger.debug("writing message to %s", self.conf.topic)
+        if topic is None:
+            if self.conf.topic is not None:
+                topic = self.conf.topic
+            else:
+                raise Exception("No topic specified for write: "
+                                "Either configure a topic when consturcting the Producer, "
+                                "or specify the topic argument to write()")
+        self.logger.debug("writing message to %s", topic)
         if delivery_callback is not None:
-            self._producer.produce(self.conf.topic, msg, headers=headers,
+            self._producer.produce(topic, msg, headers=headers,
                                    on_delivery=delivery_callback)
         else:
-            self._producer.produce(self.conf.topic, msg, headers=headers)
+            self._producer.produce(topic, msg, headers=headers)
 
     def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
@@ -78,7 +86,7 @@ class Producer:
 @dataclasses.dataclass
 class ProducerConfig:
     broker_urls: List[str]
-    topic: str
+    topic: Optional[str]
     auth: Optional[SASLAuth] = None
     error_callback: Optional[ErrorCallback] = log_client_errors
 
