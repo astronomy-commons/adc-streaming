@@ -43,7 +43,7 @@ class Producer:
                 topic = self.conf.topic
             else:
                 raise Exception("No topic specified for write: "
-                                "Either configure a topic when consturcting the Producer, "
+                                "Either configure a topic when constructing the Producer, "
                                 "or specify the topic argument to write()")
         self.logger.debug("writing message to %s", topic)
         if delivery_callback is not None:
