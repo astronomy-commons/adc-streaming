@@ -38,6 +38,8 @@ class SASLAuth(object):
     ssl_ca_location : `str`, optional
         If using SSL via a self-signed cert, a path/location
         to the certificate.
+    ssl_endpoint_identification_algorithm : `str`, optional
+        If using SSL, the algorithm used to verify that certificate is valid for the endpoint.
     token_endpoint : `str`, optional
         The OpenID Connect token endpoint URL.
         Required for OAUTHBEARER / OpenID Connect, otherwise ignored.
@@ -63,6 +65,9 @@ class SASLAuth(object):
                 "security.protocol": "SASL_SSL",
                 "ssl.ca.location": ssl_cert,
             }
+            if "ssl_endpoint_identification_algorithm" in kwargs:
+                self._config["ssl.endpoint.identification.algorithm"] = \
+                    kwargs["ssl_endpoint_identification_algorithm"]
         else:
             self._config = {"security.protocol": "SASL_PLAINTEXT"}
 
