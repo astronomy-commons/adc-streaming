@@ -451,6 +451,10 @@ class KafkaDockerConnection:
         self.auth = adc.auth.SASLAuth(
             user="test", password="test-pass",
             ssl_ca_location=self.certfile.name,
+            # disable endpoint verification because the docker service generates a certificate with
+            # a useless subject (the container ID) which can never match the hostname used to
+            # connect (typically 0.0.0.0)
+            ssl_endpoint_identification_algorithm="none",
         )
 
     def poll_for_kafka_broker_address(self, maxiter=20, sleep=timedelta(milliseconds=500)):
