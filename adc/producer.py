@@ -36,7 +36,8 @@ class Producer:
               msg: Union[bytes, 'Serializable'],
               headers: Optional[Union[dict, list]] = None,
               delivery_callback: Optional[DeliveryCallback] = log_delivery_errors,
-              topic: Optional[str] = None) -> None:
+              topic: Optional[str] = None,
+              key: Optional[Union[str, bytes]] = None) -> None:
         if isinstance(msg, Serializable):
             msg = msg.serialize()
         if topic is None:
@@ -48,10 +49,10 @@ class Producer:
                                 "or specify the topic argument to write()")
         self.logger.debug("writing message to %s", topic)
         if delivery_callback is not None:
-            self._producer.produce(topic, msg, headers=headers,
+            self._producer.produce(topic, msg, headers=headers, key=key,
                                    on_delivery=delivery_callback)
         else:
-            self._producer.produce(topic, msg, headers=headers)
+            self._producer.produce(topic, msg, headers=headers, key=key,)
 
     def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
