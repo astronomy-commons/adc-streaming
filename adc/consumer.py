@@ -38,7 +38,8 @@ class Consumer:
         self.logger = logging.getLogger("adc-streaming.consumer")
         self.conf = conf
         self._consumer = confluent_kafka.Consumer(conf._to_confluent_kafka())
-        # Workaround for https://github.com/confluentinc/librdkafka/issues/3753#issuecomment-1058272987.
+        # Workaround for
+        # https://github.com/confluentinc/librdkafka/issues/3753#issuecomment-1058272987.
         # FIXME: Remove once fixed upstream, or on removal of oauth_cb.
         self._consumer.poll(0)
         self._stop_event = threading.Event()
@@ -196,7 +197,7 @@ class Consumer:
                             self.mark_done(m, asynchronous=True)
                         yield m
                     else:
-                        raise(confluent_kafka.KafkaException(err))
+                        raise (confluent_kafka.KafkaException(err))
             finally:
                 if autocommit:
                     self._consumer.commit(asynchronous=True)
@@ -242,7 +243,7 @@ class Consumer:
                             # Done with all partitions for the topic, remove it
                             del active_partitions[m.topic()]
                     else:
-                        raise(confluent_kafka.KafkaException(err))
+                        raise (confluent_kafka.KafkaException(err))
             finally:
                 if autocommit:
                     self._consumer.commit(asynchronous=True)

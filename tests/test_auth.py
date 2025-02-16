@@ -1,6 +1,6 @@
 import pytest
 
-from adc.auth import SASLAuth, SASLMethod
+from adc.auth import SASLAuth
 
 
 @pytest.mark.parametrize('auth,expected_config', [

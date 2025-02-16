@@ -2,7 +2,7 @@ import logging
 import tempfile
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List
 
 import docker
@@ -283,7 +283,7 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             "message 1",
             "message 2",
             "message 3",
-        ])        
+        ])
         # Wait a while, write, and wait some more
         time.sleep(2)
         client_middle_time = datetime.now()
@@ -390,8 +390,8 @@ class KafkaIntegrationTestCase(unittest.TestCase):
             topic=None,
             auth=self.kafka.auth,
         ))
-        for i in range(0,8):
-            producer.write(str(i), topic=topics[i%2])
+        for i in range(0, 8):
+            producer.write(str(i), topic=topics[i % 2])
         producer.flush()
         logger.info("messages sent")
 
@@ -403,12 +403,12 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         ))
         consumer.subscribe(topics)
         stream = consumer.stream()
-        total_messages = 0;
+        total_messages = 0
         for msg in stream:
             if msg.error() is not None:
                 raise Exception(msg.error())
             idx = int(msg.value())
-            self.assertEqual(msg.topic(), topics[idx%2])
+            self.assertEqual(msg.topic(), topics[idx % 2])
             total_messages += 1
             if total_messages == 8:
                 break
@@ -554,7 +554,7 @@ class KafkaDockerConnection:
             # these tests cannot run if there is already an instance of Kafka running on
             # the same host.
             ports={"9092/tcp": 9092},
-            command=["/root/runServer","--advertisedListener","SASL_SSL://localhost:9092"],
+            command=["/root/runServer", "--advertisedListener", "SASL_SSL://localhost:9092"],
         )
 
     def get_or_create_docker_network(self):
