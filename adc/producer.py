@@ -27,7 +27,8 @@ class Producer:
         self.conf = conf
         self.logger.debug(f"connecting to producer with config {conf._to_confluent_kafka()}")
         self._producer = confluent_kafka.Producer(conf._to_confluent_kafka())
-        # Workaround for https://github.com/confluentinc/librdkafka/issues/3753#issuecomment-1058272987.
+        # Workaround for
+        # https://github.com/confluentinc/librdkafka/issues/3753#issuecomment-1058272987.
         # FIXME: Remove once fixed upstream, or on removal of oauth_cb.
         self._producer.poll(0)
 
