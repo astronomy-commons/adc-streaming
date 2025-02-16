@@ -3,7 +3,7 @@ import tempfile
 import time
 import unittest
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 import docker
 import pytest
@@ -58,6 +58,31 @@ class KafkaIntegrationTestCase(unittest.TestCase):
 
         self.assertEqual(msg.topic(), topic)
         self.assertEqual(msg.value(), b"can you hear me?")
+
+    def test_message_with_key(self):
+        """Try writing a message into the Kafka broker, and try pulling the same
+        message back out.
+
+        """
+        topic = "test_message_with_key"
+        # Push one message in...
+        simple_write_msg(self.kafka, topic, "can you hear me?", key="test_msg")
+        # ... and pull it back out.
+        consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+            broker_urls=[self.kafka.address],
+            group_id="test_consumer",
+            auth=self.kafka.auth,
+        ))
+        consumer.subscribe(topic)
+        stream = consumer.stream()
+
+        msg = next(stream)
+        if msg.error() is not None:
+            raise Exception(msg.error())
+
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"can you hear me?")
+        self.assertEqual(msg.key(), b"test_msg")
 
     def test_reset_to_end(self):
         # Write a few messages.
@@ -569,13 +594,13 @@ class KafkaDockerConnection:
         return self.docker_client.networks.create(name="adc-integration-test")
 
 
-def simple_write_msg(conn: KafkaDockerConnection, topic: str, msg: str):
+def simple_write_msg(conn: KafkaDockerConnection, topic: str, msg: str, key: Optional[str] = None):
     producer = adc.producer.Producer(adc.producer.ProducerConfig(
         broker_urls=[conn.address],
         topic=topic,
         auth=conn.auth,
     ))
-    producer.write(msg)
+    producer.write(msg, key=key)
     producer.flush()
 
 
