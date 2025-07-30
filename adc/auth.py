@@ -64,6 +64,7 @@ class SASLAuth(object):
             self._config = {
                 "security.protocol": "SASL_SSL",
                 "ssl.ca.location": ssl_cert,
+                "https.ca.location": ssl_cert,
             }
             if "ssl_endpoint_identification_algorithm" in kwargs:
                 self._config["ssl.endpoint.identification.algorithm"] = \
