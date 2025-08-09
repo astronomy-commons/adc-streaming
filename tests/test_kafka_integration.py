@@ -84,6 +84,44 @@ class KafkaIntegrationTestCase(unittest.TestCase):
         self.assertEqual(msg.value(), b"can you hear me?")
         self.assertEqual(msg.key(), b"test_msg")
 
+    def test_message_with_callback(self):
+        """Try writing a message into the Kafka broker, with a delivery callback.
+        """
+        topic = "test_message_with_callback"
+        callback_called = False
+        callback_error = False
+
+        def callback(err, msg):
+            nonlocal callback_called
+            nonlocal callback_error
+            callback_called = True
+            callback_error = err is not None
+
+        ap = adc.producer
+        with ap.Producer(ap.ProducerConfig(broker_urls=[self.kafka.address],
+                                           topic=topic, auth=self.kafka.auth)) as producer:
+            producer.write("message data", delivery_callback=callback)
+            producer.flush()
+            consumer = adc.consumer.Consumer(adc.consumer.ConsumerConfig(
+                broker_urls=[self.kafka.address],
+                group_id="test_consumer",
+                auth=self.kafka.auth,
+            ))
+            consumer.subscribe(topic)
+            stream = consumer.stream()
+
+            msg = next(stream)
+            if msg.error() is not None:
+                raise Exception(msg.error())
+            # give the producer's background thread time to notice the ack from the broker and
+            # fire the callback
+            producer._producer.poll(0.1)
+
+        self.assertEqual(msg.topic(), topic)
+        self.assertEqual(msg.value(), b"message data")
+        self.assertEqual(callback_called, True)
+        self.assertEqual(callback_error, False)
+
     def test_reset_to_end(self):
         # Write a few messages.
         topic = "test_reset_to_end"
@@ -486,7 +524,7 @@ class KafkaDockerConnection:
         """Block until the Docker daemon tells us the IP and Port of the Kafa broker.
 
         Returns the ip and port as a string in the form "ip:port."
-"""
+        """
         i = 0
         while (not self.query_kafka_broker_address()) and i < maxiter:
             logger.info("polling to wait for container to acquire port...")
@@ -508,7 +546,7 @@ class KafkaDockerConnection:
         port = addrs[0]['HostPort']
         return f"{ip}:{port}"
 
-    def poll_for_kafka_active(self, maxiter=20, sleep=timedelta(milliseconds=500)):
+    def poll_for_kafka_active(self, maxiter=40, sleep=timedelta(milliseconds=500)):
         """Block until Kafka's network listener is accepting connections."""
         i = 0
         while (not self.query_kafka_active()) and i < maxiter:

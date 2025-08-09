@@ -47,11 +47,26 @@ class Producer:
                                 "Either configure a topic when constructing the Producer, "
                                 "or specify the topic argument to write()")
         self.logger.debug("writing message to %s", topic)
+        produce_kwargs = {"headers": headers, "key": key}
         if delivery_callback is not None:
-            self._producer.produce(topic, msg, headers=headers, key=key,
-                                   on_delivery=delivery_callback)
-        else:
-            self._producer.produce(topic, msg, headers=headers, key=key,)
+            produce_kwargs["on_delivery"] = delivery_callback
+        while True:
+            try:
+                self._producer.produce(topic, msg, **produce_kwargs)
+                break
+            except BufferError:
+                # It's hard to know what the size limit on the buffer is, so we will try to
+                # wait until the number of items in it decreases (or it is empty, in case all
+                # messages were successfully sent in the time it took to handle the error).
+                buffer_len = len(self._producer)
+                self.logger.debug(f"Blocking due to BufferError, buffer size: {buffer_len}")
+                while buffer_len > 0 and len(self._producer) == buffer_len:
+                    self._producer.poll(0.01)
+
+    def queued_message_count(self):
+        """Get the number of messages waiting to be sent to the broker.
+        """
+        return len(self._producer)
 
     def flush(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         """Attempt to flush enqueued messages. Return the number of messages still
@@ -65,9 +80,9 @@ class Producer:
             self.logger.debug("flushed all messages")
         return n
 
-    def close(self) -> int:
+    def close(self, timeout: timedelta = timedelta(seconds=10)) -> int:
         self.logger.debug("shutting down producer")
-        return self.flush()
+        return self.flush(timeout)
 
     def __enter__(self) -> 'Producer':
         return self
