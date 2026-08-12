@@ -28,7 +28,16 @@ from adc.auth import SASLAuth
             'sasl.password': 'test-pass',
             'security.protocol': 'SASL_SSL'
         }
-    ]
+    ],
+    [
+        SASLAuth(
+            'test', '', token_command="generate_token"
+        ),
+        {
+            'sasl.mechanism': 'OAUTHBEARER',
+            'sasl.oauthbearer.method': 'default',
+        }
+    ],
 ])
 def test_auth(auth, expected_config):
     # Check that the key/value pairs in expected_config are a subset
