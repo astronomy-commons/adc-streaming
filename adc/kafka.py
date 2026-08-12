@@ -14,12 +14,12 @@ def parse_kafka_url(val):
     if parsed.scheme != "kafka":
         raise ValueError("invalid kafka URL: must start with 'kafka://'")
 
+    group_id = parsed.username
+    # intentionally ignore passwords embedded in URLs to discourage their use
     split_netloc = parsed.netloc.split("@", maxsplit=1)
     if len(split_netloc) == 2:
-        group_id = split_netloc[0]
         broker_addresses = split_netloc[1].split(",")
     else:
-        group_id = None
         broker_addresses = split_netloc[0].split(",")
 
     topics = parsed.path.lstrip("/")
