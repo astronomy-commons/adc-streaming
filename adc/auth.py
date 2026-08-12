@@ -55,10 +55,11 @@ class SASLAuth(object):
 
     def __init__(self, user, password, ssl=True, method=None, token_endpoint=None, **kwargs):
         if method is None:
-            if token_endpoint is None:
-                method = SASLMethod.PLAIN
-            else:
+            if token_endpoint is not None or "token_command" in kwargs:
                 method = SASLMethod.OAUTHBEARER
+            else:
+                method = SASLMethod.PLAIN
+
         self._method = method
 
         # set up SSL options
