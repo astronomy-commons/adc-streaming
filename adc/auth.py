@@ -134,8 +134,7 @@ class SASLAuth(object):
             exp_value = claims["exp"]
             if not isinstance(exp_value, int) and not isinstance(exp_value, float):
                 raise RuntimeError("Token expiration value is not a number")
-            if isinstance(exp_value, int):
-                exp_value = float(exp_value)
+            exp_value = float(exp_value)
             try:
                 return (rawdata.decode("utf-8").strip(), exp_value, claims["sub"], {})
             except UnicodeDecodeError:
