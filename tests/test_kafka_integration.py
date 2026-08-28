@@ -5,7 +5,11 @@ import unittest
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-import docker
+try:
+	import docker
+	have_docker = True
+except ImportError:
+	have_docker = False
 import pytest
 
 import adc.consumer
@@ -17,6 +21,7 @@ logging.getLogger("adc-streaming").setLevel(logging.DEBUG)
 logger = logging.getLogger("adc-streaming.tests")
 
 
+@pytest.mark.skipif(not have_docker, reason="requires docker")
 @pytest.mark.integration_test
 class KafkaIntegrationTestCase(unittest.TestCase):
     """This test runs a Kafka broker in a Docker container, and makes sure that
