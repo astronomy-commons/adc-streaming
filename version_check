@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Check that the version recorded in a source dist tarball matches what is expected from the VCS
+
+# Get the current version tag
+TAG_VERSION=$(git describe --tags --abbrev=0 | sed 's|^v||')
+
+# Check that each tarball contains the same version
+for tarball in $@; do
+	filename=$(basename "$tarball" | sed 's|\.tar\.gz$||')
+	SDIST_VERSION=$(tar xzf "$tarball" -O "${filename}/PKG-INFO" | sed -n 's|^Version: ||p')
+	if [ "$SDIST_VERSION" = "$TAG_VERSION" ]; then
+		echo "$tarball: $SDIST_VERSION [OK]"
+	else
+		echo "$tarball: $SDIST_VERSION [FAIL]"
+		FAIL=1
+	fi
+done
+if [ "$FAIL" ]; then
+	exit 1
+fi

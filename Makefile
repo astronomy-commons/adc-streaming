@@ -56,6 +56,7 @@ pypi-dist :
 .PHONY: pypi-dist-check
 pypi-dist-check:
 	twine check dist/*
+	./version_check dist/*.tar.gz
 
 .PHONY: pypi-upload
 pypi-upload:
