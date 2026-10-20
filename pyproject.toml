@@ -2,4 +2,50 @@
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "adc-streaming"
+description = "Astronomy Data Commons streaming client libraries"
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = [
+	"LICENSE",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "confluent-kafka >= 2.11.0",
+    "dataclasses ; python_version < '3.7'",
+    "importlib-metadata ; python_version < '3.8'",
+    "tqdm",
+    "certifi>=2020.04.05.1",
+    "typing-extensions ; python_version < '3.8'",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/astronomy-commons/adc-streaming/"
+Issues = "https://github.com/astronomy-commons/adc-streaming/issues"
+
+[project.optional-dependencies]
+dev = [
+    "autopep8",
+    "build",
+    "docker",
+    "flake8",
+    "isort",
+    "pytest",
+    "pytest-timeout",
+    "pytest-integration",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "twine",
+]
+docs = [
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinxcontrib-programoutput",
+]
+
+[tool.setuptools]
+packages = ["adc"]
+
 [tool.setuptools_scm]

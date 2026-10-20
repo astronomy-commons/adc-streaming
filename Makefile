@@ -51,7 +51,7 @@ changelog :
 
 .PHONY: pypi-dist
 pypi-dist :
-	python setup.py sdist bdist_wheel
+	python -m build --sdist --wheel
 
 .PHONY: pypi-dist-check
 pypi-dist-check:
